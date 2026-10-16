@@ -55,7 +55,7 @@ function sanitize(raw) {
       pattern: str(t?.pattern, 800),
       rate: [4, 2, 1, 0.25].includes(+t?.rate) ? +t.rate : 4,
       note: noteToFreq(str(t?.note, 4)) ? t.note : undefined,
-      gain: num(t?.gain, 0, 1.5, 0.7), pan: num(t?.pan, -1, 1, 0),
+      gain: num(t?.gain, 0, 2.5, 0.7), pan: num(t?.pan, -1, 1, 0),
       lp: num(t?.lp, 0, 20000, 0), hp: num(t?.hp, 0, 20000, 0),
       echo: num(t?.echo, 0, 0.9, 0), echoTime: num(t?.echoTime, 0.0625, 4, 0.75),
       len: t?.len == null ? undefined : num(t.len, 0.005, 16, 1),
@@ -1140,9 +1140,50 @@ const b64 = {
   encode: (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
   decode: (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))),
 };
+// Share links: the song as JSON, minus anything that matches the defaults (a built-in sound's
+// equation, zero effects), deflated and base64url-encoded into the hash (#z=). Old #s= links
+// (plain base64 JSON) still open.
+const TRACK_DEFAULTS = { rate: 4, pan: 0, lp: 0, hp: 0, echo: 0, echoTime: 0.75, mute: false, solo: false };
+function slim(s) {
+  return { ...s, tracks: s.tracks.map((t) => {
+    const out = {};
+    for (const [k, v] of Object.entries(t)) {
+      if (v === undefined || TRACK_DEFAULTS[k] === v) continue;
+      if (k === 'equation' && v === byId[t.instrument]?.equation) continue;
+      if (k === 'ranges' && !Object.keys(v).length) continue;
+      out[k] = v;
+    }
+    return out;
+  }) };
+}
+function unslim(s) {
+  for (const t of Array.isArray(s?.tracks) ? s.tracks : []) {
+    if (t && t.equation == null && Object.hasOwn(byId, t.instrument)) t.equation = byId[t.instrument].equation;
+  }
+  return s;
+}
+const pipeBytes = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+const toB64url = (bytes) => { let bin = ''; for (const x of bytes) bin += String.fromCharCode(x); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const fromB64url = (str) => Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+async function shareHash(s) {
+  const json = JSON.stringify(slim(s));
+  if (typeof CompressionStream === 'undefined') return `#s=${b64.encode(json)}`;
+  return `#z=${toB64url(await pipeBytes(new TextEncoder().encode(json), new CompressionStream('deflate-raw')))}`;
+}
+async function songFromHash(hash) {
+  if (hash.startsWith('#s=')) return unslim(JSON.parse(b64.decode(hash.slice(3))));
+  if (hash.startsWith('#z=')) return unslim(JSON.parse(new TextDecoder().decode(await pipeBytes(fromB64url(hash.slice(3)), new DecompressionStream('deflate-raw')))));
+  return null;
+}
+
 $('#share').addEventListener('click', async () => {
-  const url = `${location.origin}${location.pathname}#s=${b64.encode(JSON.stringify(song))}`;
+  const url = `${location.origin}${location.pathname}${await shareHash(song)}`;
   history.replaceState(null, '', url);
+  // Phones get the native share sheet (Messages, WhatsApp, ...); everyone else gets the clipboard.
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+    try { await navigator.share({ title: `${song.title} · equalizer`, text: 'A beat made from math equations', url }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
   try { await navigator.clipboard.writeText(url); toast('Link copied: anyone can open your beat'); }
   catch { window.prompt('Copy this link to share your beat:', url); }
 });
@@ -1176,14 +1217,23 @@ $('#fns').textContent = [...Object.keys(FUNCTIONS), ...Object.keys(CONSTANTS)].j
 
 // --- Start ---------------------------------------------------------------------------
 
-let initial = null;
-if (location.hash.startsWith('#s=')) {
-  try {
-    initial = JSON.parse(b64.decode(location.hash.slice(3)));
-    songPick.add(new Option('Shared beat', 'shared'));
-    songPick.value = 'shared';
-  } catch { toast("That share link couldn't be read"); }
+function showShared() {
+  if (![...songPick.options].some((o) => o.value === 'shared')) songPick.add(new Option('Shared beat', 'shared'));
+  songPick.value = 'shared';
 }
+let initial = null;
+try { initial = await songFromHash(location.hash); if (initial) showShared(); }
+catch { toast("That share link couldn't be read"); }
+// Pasting a share link into a tab that already has the studio open only changes the hash.
+window.addEventListener('hashchange', async () => {
+  try {
+    const shared = await songFromHash(location.hash);
+    if (!shared) return;
+    load(shared);
+    showShared();
+    changed({ now: true });
+  } catch { toast("That share link couldn't be read"); }
+});
 if (!initial) { try { initial = JSON.parse(localStorage.getItem('eq-song-v2')); } catch {} }
 load(initial ?? structuredClone(SONGS.trap));
 if (!initial) songPick.value = 'trap';
