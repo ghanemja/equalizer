@@ -267,6 +267,7 @@ function buildGrid() {
 
   rows = song.tracks.map((t, i) => buildRow(t, i));
   for (const r of rows) grid.append(r.el);
+  paintSilenced();
 
   // add a sound
   const add = instrumentSelect(null, (id) => {
@@ -291,9 +292,15 @@ const svgIcon = (body) => `<svg viewBox="0 0 24 24" width="15" height="15" fill=
 const SPEAKER = '<path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>';
 const ICONS = {
   sound: svgIcon(SPEAKER + '<path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>'),
-  muted: svgIcon(SPEAKER + '<path d="m16 9 6 6m0-6-6 6"/>'),
-  solo: svgIcon('<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5" fill="currentColor"/><rect x="17" y="14" width="4" height="7" rx="1.5" fill="currentColor"/>'),
+  // The same speaker with its waves, struck through.
+  muted: svgIcon(SPEAKER + '<path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" opacity=".35"/><path d="M3 3l18 18" stroke-width="2.4"/>'),
 };
+
+/** While any sound is soloed, dim the rows you can't hear. */
+function paintSilenced() {
+  const soloing = song.tracks.some((t) => t.solo);
+  for (const r of rows) r.el.classList.toggle('silenced', soloing && !r.track.solo);
+}
 
 function buildRow(t, i) {
   const kind = kindOf(t);
@@ -301,22 +308,14 @@ function buildRow(t, i) {
   const name = h('button', { class: 'row-name', title: 'Edit this sound', 'aria-label': `Select ${t.name}`, onclick: () => select(i) },
     t.name, h('small', { text: soundName(t).replace(/^.*? · /, '') }));
   const mute = h('button', { class: 'chip mute', 'aria-label': `Mute ${t.name}` });
-  const solo = h('button', { class: 'chip solo', 'aria-label': `Solo ${t.name}` });
-  solo.innerHTML = ICONS.solo;
   const paintMute = () => {
     mute.classList.toggle('on', !!t.mute);
     mute.setAttribute('aria-pressed', String(!!t.mute));
     mute.title = t.mute ? 'Muted: click to unmute' : 'Click to mute';
     mute.innerHTML = t.mute ? ICONS.muted : ICONS.sound;
   };
-  const paintSolo = () => {
-    solo.classList.toggle('on', !!t.solo);
-    solo.setAttribute('aria-pressed', String(!!t.solo));
-    solo.title = t.solo ? 'Solo on: click to hear everything again' : 'Solo: hear only this sound';
-  };
-  paintMute(); paintSolo();
+  paintMute();
   mute.addEventListener('click', () => { t.mute = !t.mute; paintMute(); el.classList.toggle('muted', t.mute); plots[i]?.el.classList.toggle('muted', t.mute); changed({ now: true }); });
-  solo.addEventListener('click', () => { t.solo = !t.solo; paintSolo(); changed({ now: true }); });
   const del = h('button', { class: 'chip del', title: `Remove ${t.name}`, 'aria-label': `Remove ${t.name}`, text: '×', onclick: () => removeTrack(i) });
 
   const cells = h('div', { class: 'cells' });
@@ -325,7 +324,7 @@ function buildRow(t, i) {
   gainTitle();
   gain.addEventListener('input', () => { t.gain = +gain.value; gainTitle(); changed(); });
   const vu = h('i');
-  el.append(h('div', { class: 'head' }, h('span', { class: 'dot' }), name, mute, solo, del), cells, h('div', { class: 'tail' }, gain, h('div', { class: 'vu' }, vu)));
+  el.append(h('div', { class: 'head' }, h('span', { class: 'dot' }), name, mute, del), cells, h('div', { class: 'tail' }, gain, h('div', { class: 'vu' }, vu)));
   const row = { el, cells, vu, track: t, index: i };
   drawCells(row);
   return row;
@@ -678,6 +677,15 @@ function buildInspector() {
       onInput: (v) => { t.params[k] = v; refresh(); changed(); },
     }));
   }
+  const soloBtn = h('button', { class: `mini-btn solo${t.solo ? ' on' : ''}`, 'aria-pressed': String(!!t.solo), text: t.solo ? 'Stop solo' : 'Solo: hear only this' });
+  soloBtn.addEventListener('click', () => {
+    t.solo = !t.solo;
+    soloBtn.classList.toggle('on', t.solo);
+    soloBtn.setAttribute('aria-pressed', String(t.solo));
+    soloBtn.textContent = t.solo ? 'Stop solo' : 'Solo: hear only this';
+    paintSilenced();
+    changed({ now: true });
+  });
   const soundCard = h('section', { class: 'insp-card', 'data-kind': kind },
     h('h2', {}, h('span', { class: 'n', text: '1' }), 'Sound'),
     h('div', { class: 'row2' },
@@ -688,6 +696,7 @@ function buildInspector() {
     knobs,
     h('div', { class: 'btn-row' },
       h('button', { class: 'mini-btn', text: 'Shuffle knobs', onclick: () => { shuffle(t); buildInspector(); showSelected(); changed({ now: true }); } }),
+      soloBtn,
       h('button', { class: 'mini-btn danger', text: 'Remove sound', onclick: () => removeTrack(selected) })));
 
   // 2. The math
