@@ -99,6 +99,10 @@ node examples/render.mjs house house.wav        # a built-in song
 node examples/render.mjs ./my-song.js out.wav   # a module that default-exports a song
 ```
 
+## Built-in songs
+
+Four on the floor (house), Painted (the art-medium promo theme, with its splats, pops and whoosh), Night drive (synthwave), Midnight 808 (trap), Wobble lab (dubstep), Lo-fi homework and Level 1-1 (chiptune). Pick one from the Song menu, or render it with `node examples/render.mjs <id>`: `house`, `painted`, `synthwave`, `trap`, `dubstep`, `lofi`, `chip`.
+
 ## Develop
 
 ```sh

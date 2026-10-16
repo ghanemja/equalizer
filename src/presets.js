@@ -214,6 +214,64 @@ export const SONGS = {
       track('supersaw', { pattern: chords(['C', 'Am', 'F', 'G']) }),
     ],
   },
+  painted: {
+    title: 'Painted (art-medium theme)', bpm: 120, bars: 4,
+    tracks: [
+      track('kick'),
+      track('clap', { gain: 0.5 }),
+      track('hat', { name: 'Open hat', pattern: '..x...x...x...x.', params: { metal: 0, decay: 22 }, hp: 6500, gain: 0.32 }),
+      track('hat', { pattern: 'x.x.x.x.x.x.x.x.', params: { metal: 0, decay: 55 }, hp: 7000, gain: 0.16, pan: 0.2 }),
+      track('sawbass', { pattern: bassline(['C', 'Am', 'F', 'G'], '. . x .'), params: { sub: 1 }, gain: 0.65 }),
+      track('pluck', { name: 'Pluck', pattern: arp(['C', 'Am', 'F', 'G']), params: { bright: 0.3 }, gain: 0.42, pan: -0.2, echo: 0.22 }),
+      track('supersaw', { pattern: chords(['C', 'Am', 'F', 'G']), lp: 1700, gain: 0.4 }),
+      track('splat', { name: 'Splat', pattern: 'x' + '.'.repeat(63), gain: 0.45 }),
+      track('pop', { name: 'Pops', pattern: '.'.repeat(28) + 'x.x.' + '.'.repeat(32), gain: 0.35 }),
+      // Starts 3 steps (0.375 s) before the loop ends, so it peaks right on the downbeat.
+      track('whoosh', { name: 'Whoosh', pattern: '.'.repeat(61) + 'x..', gain: 0.45 }),
+    ],
+  },
+  synthwave: {
+    title: 'Night drive', bpm: 100, bars: 4,
+    tracks: [
+      track('kick', { params: { decay: 8 } }),
+      track('snare', { params: { tone: 0.45, decay: 13 }, echo: 0.2, gain: 0.6 }),
+      track('hat', { pattern: 'x.x.x.x.x.x.x.x.', params: { decay: 60 }, gain: 0.28 }),
+      track('sawbass', { pattern: bassline(['Am', 'F', 'C', 'G'], 'x .'), params: { sub: 0.4, decay: 4 }, lp: 900, gain: 0.55 }),
+      track('lead', {
+        pattern: 'E5 . . . A5 . . . G5 . E5 . . . D5 . C5 . . . . . . . A4 . C5 . D5 . . . E5 . . . G5 . . . E5 . D5 . C5 . . . D5 . . . . . B4 . D5 . . . G5 . . .',
+        params: { vib: 0.12, decay: 1.2 }, echo: 0.3, gain: 0.28,
+      }),
+      track('choir', { pattern: chords(['Am', 'F', 'C', 'G']), gain: 0.4 }),
+    ],
+  },
+  trap: {
+    title: 'Midnight 808', bpm: 140, bars: 4,
+    tracks: [
+      track('kick808', { pattern: 'x.........x.....x.........x..x..' }),
+      track('clap', { pattern: '........x.......', gain: 0.5 }),
+      track('hat', { pattern: 'x.x.x.x.x.x.xxxxx.x.x.x.x.x.x.x.', params: { decay: 80 }, gain: 0.3 }),
+      track('rim', { pattern: '...x.....x....x.', gain: 0.22 }),
+      track('bell', {
+        name: 'Bells', pattern: 'A5 . . C6 . . E6 . D6 . . C6 . . A5 . G5 . . . A5 . . C6 . . . . . . . .',
+        params: { ratio: 3.5, decay: 2.5 }, echo: 0.35, gain: 0.32,
+      }),
+      track('choir', { pattern: chords(['Am', 'F', 'C', 'G'], -1), gain: 0.3 }),
+    ],
+  },
+  dubstep: {
+    title: 'Wobble lab', bpm: 140, bars: 4,
+    tracks: [
+      track('kick', { pattern: 'x.........x.....', params: { decay: 6 } }),
+      track('snare', { pattern: '........x.......', params: { tone: 0.3, decay: 10 }, gain: 0.7 }),
+      track('hat', { pattern: '..x...x...x...x.', gain: 0.3 }),
+      track('wobble', {
+        name: 'Wobble', pattern: 'C2 . . . . . . . . . . . . . . . Eb2 . . . . . . . G1 . . . . . . . C2 . . . . . . . . . . . . . . . Bb1 . . . . . . . G1 . . . Ab1 . . .',
+        params: { rate: 3 }, gain: 0.7,
+      }),
+      track('bell', { name: 'Bells', pattern: 'G5 . . . Eb5 . . . F5 . . . D5 . . .', rate: 1, gain: 0.25 }),
+      track('riser', { name: 'Riser', pattern: '.'.repeat(56) + 'x.......', params: { rise: 1 }, gain: 0.3 }),
+    ],
+  },
   lofi: {
     title: 'Lo-fi homework', bpm: 84, bars: 4,
     tracks: [
