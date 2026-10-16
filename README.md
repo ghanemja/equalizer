@@ -12,7 +12,7 @@ hat   = noise() * exp(-tau*55)
 
 **Open the studio:** https://ghanemja.github.io/equalizer/
 
-The studio looks like a DJ console, but every sound is just an equation. Each sound gets a row in the step grid: light up squares to make it play. Click a sound to open its panel, where the knobs are the numbers in its equation and you can edit the math itself. The math monitor on the right plots every sound's equation live: each time a sound fires, a playhead sweeps along its curve. Share any beat as a link.
+The studio looks like a DJ console, but every sound is just an equation. Each sound gets a row in the step grid: light up squares to make it play. Click a sound to open its panel, where the knobs are the numbers in its equation and you can edit the math itself. The math monitor on the right plots every sound's equation on graph paper, live: each time a sound fires, a playhead sweeps along its curve. At the top, the equation lab lets you paste any equation, hear it, see its plot, and add it to the beat in one click. Share any beat as a link.
 
 No samples, no dependencies, no build step. Every sound is computed from math, 44,100 times a second.
 

@@ -296,12 +296,13 @@ function buildRow(t, i) {
   const solo = h('button', { class: `chip solo${t.solo ? ' on' : ''}`, title: 'Solo', 'aria-pressed': String(!!t.solo), text: 'S' });
   mute.addEventListener('click', () => { t.mute = !t.mute; mute.classList.toggle('on', t.mute); mute.setAttribute('aria-pressed', String(t.mute)); el.classList.toggle('muted', t.mute); plots[i]?.el.classList.toggle('muted', t.mute); changed({ now: true }); });
   solo.addEventListener('click', () => { t.solo = !t.solo; solo.classList.toggle('on', t.solo); solo.setAttribute('aria-pressed', String(t.solo)); changed({ now: true }); });
+  const del = h('button', { class: 'chip del', title: `Remove ${t.name}`, 'aria-label': `Remove ${t.name}`, text: '×', onclick: () => removeTrack(i) });
 
   const cells = h('div', { class: 'cells' });
   const gain = h('input', { type: 'range', min: 0, max: 1.5, step: 0.01, value: t.gain ?? 0.8, 'aria-label': `${t.name} volume` });
   gain.addEventListener('input', () => { t.gain = +gain.value; changed(); });
   const vu = h('i');
-  el.append(h('div', { class: 'head' }, h('span', { class: 'dot' }), name, mute, solo), cells, h('div', { class: 'tail' }, gain, h('div', { class: 'vu' }, vu)));
+  el.append(h('div', { class: 'head' }, h('span', { class: 'dot' }), name, mute, solo, del), cells, h('div', { class: 'tail' }, gain, h('div', { class: 'vu' }, vu)));
   const row = { el, cells, vu, track: t, index: i };
   drawCells(row);
   return row;
@@ -397,50 +398,185 @@ function buildMonitor() {
     const canvas = h('canvas', { 'aria-hidden': 'true' });
     const el = h('button', { class: `plot${t.mute ? ' muted' : ''}`, 'data-kind': kindOf(t), title: `Edit ${t.name}`, onclick: () => select(i) },
       h('div', { class: 'plot-top' }, h('span', { class: 'dot' }), h('b', { text: t.name }), label),
-      h('div', { class: 'plot-eq', text: `f(τ) = ${t.equation}` }),
+      h('div', { class: 'plot-eq' }, h('i', { text: 'f(τ)' }), ' = ', prettyEq(t.equation, t.params)),
       canvas);
     box.append(el);
     return { el, canvas, label, cache: null, track: t };
   });
 }
 
-/** Curve images for one sound at one pitch: a dim full curve and a bright copy for the played part. */
-function curveFor(p, t, f) {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const w = Math.max(1, Math.round(p.canvas.clientWidth * dpr)), hgt = Math.max(1, Math.round(p.canvas.clientHeight * dpr));
-  const key = `${t.equation}|${JSON.stringify(t.params)}|${f}|${w}x${hgt}|${song.bpm}`;
-  if (p.cache?.key === key) return p.cache;
-  p.canvas.width = w; p.canvas.height = hgt;
-  const secs = PLOT_SECONDS[kindOf(t)];
-  const per = 4;
-  let samples = new Float32Array(w * per);
+// --- Math plots: graph paper, axes, ticks, labels, and the curve -------------------
+
+const PLOT_PAD = { l: 30, r: 16, t: 14, b: 20 }; // CSS px around the plot area
+const MATH_FONT = '"STIX Two Text", "Cambria Math", "Latin Modern Roman", "Times New Roman", serif';
+
+/** Sample an equation over [0, secs) at one pitch. Returns null if it doesn't compile. */
+function sampleCurve(equation, params, f, secs, n) {
   try {
-    const fn = compile(t.equation, Object.keys(t.params));
-    const pv = Object.values(paramValues(t.params));
-    for (let i = 0; i < samples.length; i++) {
-      const tau = (i / samples.length) * secs;
+    const fn = compile(equation, Object.keys(params));
+    const pv = Object.values(paramValues(params));
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const tau = (i / n) * secs;
       const v = fn(tau, tau, f, tau * song.bpm / 60, 0, 0, 0.5, song.bpm, ...pv);
-      samples[i] = Number.isFinite(v) ? Math.max(-1.2, Math.min(1.2, v)) : 0;
+      out[i] = Number.isFinite(v) ? Math.max(-1.2, Math.min(1.2, v)) : 0;
     }
-  } catch { samples = null; }
-  const color = getComputedStyle(p.el).getPropertyValue('--c').trim() || '#00e5ff';
-  const draw = (alpha, glow) => {
-    const c = document.createElement('canvas');
-    c.width = w; c.height = hgt;
-    const g = c.getContext('2d');
-    if (!samples) return c;
-    g.fillStyle = color;
-    g.globalAlpha = alpha;
-    if (glow) { g.shadowColor = color; g.shadowBlur = 8; }
-    for (let x = 0; x < w; x++) {
-      let lo = Infinity, hi = -Infinity;
-      for (let k = 0; k < per; k++) { const v = samples[x * per + k]; if (v < lo) lo = v; if (v > hi) hi = v; }
-      const y1 = hgt / 2 - hi * hgt * 0.4, y2 = hgt / 2 - lo * hgt * 0.4;
-      g.fillRect(x, y1, 1, Math.max(1, y2 - y1));
-    }
-    return c;
+    return out;
+  } catch { return null; }
+}
+
+const tickLabel = (v) => (v === 0 ? '0' : `${+v.toFixed(v < 0.1 ? 3 : 2)}`);
+
+/**
+ * Pre-render a plot: `bg` holds graph paper, axes, ticks, labels and the dim curve;
+ * `bright` holds the full-strength curve, revealed up to the playhead each frame.
+ */
+function renderPlot(canvas, samples, secs, color) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.round(canvas.clientWidth * dpr)), hgt = Math.max(1, Math.round(canvas.clientHeight * dpr));
+  canvas.width = w; canvas.height = hgt;
+  const x0 = PLOT_PAD.l * dpr, x1 = w - PLOT_PAD.r * dpr, yT = PLOT_PAD.t * dpr, yB = hgt - PLOT_PAD.b * dpr;
+  const ym = (yT + yB) / 2, amp = ((yB - yT) / 2) * 0.86;
+  const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = hgt; return c; };
+  const bg = mk(), bright = mk();
+  const g = bg.getContext('2d');
+
+  // graph paper: minor grid every 8px, major every 5 minor; horizontal lines on y = 0, ±0.5, ±1
+  const minor = 8 * dpr;
+  g.lineWidth = 1;
+  for (let x = x0, k = 0; x <= x1 + 0.5; x += minor, k++) {
+    g.strokeStyle = k % 5 ? 'rgba(120,180,255,0.05)' : 'rgba(120,180,255,0.11)';
+    g.beginPath(); g.moveTo(Math.round(x) + 0.5, yT); g.lineTo(Math.round(x) + 0.5, yB); g.stroke();
+  }
+  for (let k = -4; k <= 4; k++) {
+    const y = Math.round(ym - (k / 4) * amp) + 0.5;
+    g.strokeStyle = k % 2 ? 'rgba(120,180,255,0.05)' : 'rgba(120,180,255,0.11)';
+    g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke();
+  }
+
+  // axes with arrowheads
+  const ax = 'rgba(232,232,242,0.7)';
+  g.strokeStyle = ax; g.fillStyle = ax; g.lineWidth = Math.max(1, dpr);
+  g.beginPath(); g.moveTo(x0, Math.round(ym) + 0.5); g.lineTo(x1 + 6 * dpr, Math.round(ym) + 0.5); g.stroke();
+  g.beginPath(); g.moveTo(Math.round(x0) + 0.5, yB + 2 * dpr); g.lineTo(Math.round(x0) + 0.5, yT - 6 * dpr); g.stroke();
+  const arrow = (x, y, dx, dy) => {
+    g.beginPath(); g.moveTo(x, y);
+    g.lineTo(x - dx * 6 * dpr - dy * 3 * dpr, y - dy * 6 * dpr - dx * 3 * dpr);
+    g.lineTo(x - dx * 6 * dpr + dy * 3 * dpr, y - dy * 6 * dpr + dx * 3 * dpr);
+    g.closePath(); g.fill();
   };
-  p.cache = { key, w, hgt, secs, samples, dim: draw(0.28, false), bright: draw(1, true), color };
+  arrow(x1 + 9 * dpr, Math.round(ym) + 0.5, 1, 0);
+  arrow(Math.round(x0) + 0.5, yT - 9 * dpr, 0, -1);
+
+  // ticks and labels
+  g.font = `${9.5 * dpr}px "JetBrains Mono", monospace`;
+  g.fillStyle = 'rgba(200,200,215,0.75)';
+  g.textBaseline = 'middle'; g.textAlign = 'right';
+  for (const v of [1, 0, -1]) {
+    const y = ym - v * amp;
+    g.fillRect(x0 - 3 * dpr, Math.round(y), 3 * dpr, Math.max(1, dpr));
+    g.fillText(v < 0 ? '−1' : String(v), x0 - 5 * dpr, y);
+  }
+  g.textBaseline = 'top'; g.textAlign = 'center';
+  const ticks = [0, secs / 2, secs];
+  ticks.forEach((v, k) => {
+    const x = x0 + (v / secs) * (x1 - x0);
+    g.fillRect(Math.round(x), Math.round(ym) - 2 * dpr, Math.max(1, dpr), 4 * dpr);
+    g.textAlign = k === 0 ? 'left' : k === ticks.length - 1 ? 'right' : 'center';
+    g.fillText(k === ticks.length - 1 ? `${tickLabel(v)} s` : tickLabel(v), x + (k === 0 ? 2 * dpr : 0), yB + 4 * dpr);
+  });
+  // axis names, set like math
+  g.font = `italic ${13 * dpr}px ${MATH_FONT}`;
+  g.fillStyle = 'rgba(232,232,242,0.9)';
+  g.textAlign = 'right'; g.textBaseline = 'bottom';
+  g.fillText('τ', x1 + 8 * dpr, ym - 4 * dpr);
+  g.textAlign = 'left'; g.textBaseline = 'top';
+  g.fillText('f(τ)', x0 + 6 * dpr, yT - 8 * dpr);
+
+  // the curve: a shaded envelope band plus its upper and lower edges
+  const drawCurve = (ctx, alpha, glow) => {
+    if (!samples) return;
+    const cols = Math.max(1, Math.round(x1 - x0));
+    const hi = new Float32Array(cols), lo = new Float32Array(cols);
+    for (let c = 0; c < cols; c++) {
+      const a = Math.floor((c / cols) * samples.length), b = Math.max(a + 1, Math.floor(((c + 1) / cols) * samples.length));
+      let mn = Infinity, mx = -Infinity;
+      for (let i = a; i < b; i++) { const v = samples[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+      hi[c] = ym - mx * amp; lo[c] = ym - mn * amp;
+    }
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x0, 0, x1 - x0, hgt); ctx.clip();
+    ctx.globalAlpha = alpha * 0.22; ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(x0, hi[0]);
+    for (let c = 1; c < cols; c++) ctx.lineTo(x0 + c, hi[c]);
+    for (let c = cols - 1; c >= 0; c--) ctx.lineTo(x0 + c, lo[c]);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = 1.6 * dpr; ctx.lineJoin = 'round';
+    if (glow) { ctx.shadowColor = color; ctx.shadowBlur = 8 * dpr; }
+    for (const edge of [hi, lo]) {
+      ctx.beginPath(); ctx.moveTo(x0, edge[0]);
+      for (let c = 1; c < cols; c++) ctx.lineTo(x0 + c, edge[c]);
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+  drawCurve(g, 0.45, false);
+  drawCurve(bright.getContext('2d'), 1, true);
+  return { w, hgt, dpr, x0, x1, yT, yB, ym, amp, secs, samples, bg, bright, color };
+}
+
+/** Draw a pre-rendered plot, revealing the curve up to time tau (or none if tau is null). */
+function drawPlot(canvas, c, tau) {
+  const g = canvas.getContext('2d');
+  g.clearRect(0, 0, c.w, c.hgt);
+  g.drawImage(c.bg, 0, 0);
+  if (tau == null || tau > c.secs) return;
+  const x = c.x0 + Math.max(0, tau / c.secs) * (c.x1 - c.x0);
+  g.drawImage(c.bright, 0, 0, Math.ceil(x), c.hgt, 0, 0, Math.ceil(x), c.hgt);
+  g.save();
+  g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = Math.max(1, c.dpr);
+  g.setLineDash([3 * c.dpr, 3 * c.dpr]);
+  g.beginPath(); g.moveTo(x, c.yT); g.lineTo(x, c.yB); g.stroke();
+  g.restore();
+  const v = c.samples ? c.samples[Math.min(c.samples.length - 1, Math.floor((tau / c.secs) * c.samples.length))] : 0;
+  g.fillStyle = '#fff'; g.shadowColor = c.color; g.shadowBlur = 12 * c.dpr;
+  g.beginPath(); g.arc(x, c.ym - v * c.amp, 3.5 * c.dpr, 0, Math.PI * 2); g.fill();
+  g.shadowBlur = 0;
+}
+
+/** Equation as typeset-looking text: 2π for TAU, τ for tau, · for *, superscripts. Text nodes only. */
+function prettyEq(equation, params = {}) {
+  const frag = document.createDocumentFragment();
+  const re = /(\d+\.?\d*(?:e[+-]?\d+)?|\.\d+)|([A-Za-z_]\w*)|(\^\s*(\d+(?:\.\d+)?))|(\*)|(\s+)|(.)/gi;
+  const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '.': '·' };
+  let m;
+  while ((m = re.exec(equation))) {
+    let text = m[0], cls = '';
+    if (m[1]) cls = 'n';
+    else if (m[2]) {
+      const id = m[2];
+      if (id === 'TAU') { text = '2π'; cls = 'c'; }
+      else if (id === 'PI') { text = 'π'; cls = 'c'; }
+      else if (id === 'tau') { text = 'τ'; cls = 'v'; }
+      else if (Object.hasOwn(FUNCTIONS, id)) cls = 'fn';
+      else if (Object.hasOwn(params, id)) cls = 'p';
+      else cls = 'v';
+    } else if (m[3]) { text = [...m[4]].map((ch) => SUP[ch] ?? ch).join(''); cls = 'sup'; }
+    else if (m[5]) text = ' · ';
+    else if (m[6]) text = ' ';
+    frag.append(cls ? h('span', { class: cls, text }) : text);
+  }
+  return frag;
+}
+
+/** Curve for one sound at one pitch (cached until the equation, params, pitch or size change). */
+function curveFor(p, t, f) {
+  const key = `${t.equation}|${JSON.stringify(t.params)}|${f}|${p.canvas.clientWidth}x${p.canvas.clientHeight}|${song.bpm}`;
+  if (p.cache?.key === key) return p.cache;
+  const secs = PLOT_SECONDS[kindOf(t)];
+  const samples = sampleCurve(t.equation, t.params, f, secs, Math.max(400, p.canvas.clientWidth * 8));
+  const color = getComputedStyle(p.el).getPropertyValue('--c').trim() || '#00e5ff';
+  p.cache = { key, ...renderPlot(p.canvas, samples, secs, color) };
   return p.cache;
 }
 
@@ -467,25 +603,8 @@ function updateMonitor(pos) {
     }
     const f = hit ? hit.notes[0] : defaultFreq(t);
     const c = curveFor(p, t, f);
-    const g = p.canvas.getContext('2d');
-    const { w, hgt } = c;
-    g.clearRect(0, 0, w, hgt);
-    // axes: zero line and quarter-time ticks
-    g.fillStyle = 'rgba(255,255,255,0.07)';
-    g.fillRect(0, Math.round(hgt / 2), w, 1);
-    for (let k = 1; k < 4; k++) g.fillRect(Math.round((w * k) / 4), hgt - 5, 1, 5);
-    g.drawImage(c.dim, 0, 0);
     const tau = hit ? pos - hit.time : null;
-    if (tau != null && tau <= c.secs) {
-      const x = Math.max(1, Math.round((tau / c.secs) * w));
-      g.drawImage(c.bright, 0, 0, x, hgt, 0, 0, x, hgt);
-      g.fillStyle = '#fff';
-      g.shadowColor = c.color; g.shadowBlur = 12;
-      g.fillRect(x - 1, 0, 2, hgt);
-      const v = c.samples ? c.samples[Math.min(c.samples.length - 1, Math.floor((tau / c.secs) * c.samples.length))] : 0;
-      g.beginPath(); g.arc(x, hgt / 2 - v * hgt * 0.4, 3.5 * (w / p.canvas.clientWidth), 0, Math.PI * 2); g.fill();
-      g.shadowBlur = 0;
-    }
+    drawPlot(p.canvas, c, tau);
     p.el.classList.toggle('hit', tau != null && tau < 0.09);
     const status = tau != null ? `τ ${tau.toFixed(2)}s${isMelodic(t) ? ` · ${freqName(f)}` : ''}` : `${c.secs}s window`;
     if (p.label.textContent !== status) p.label.textContent = status;
@@ -546,12 +665,7 @@ function buildInspector() {
     knobs,
     h('div', { class: 'btn-row' },
       h('button', { class: 'mini-btn', text: 'Shuffle knobs', onclick: () => { shuffle(t); buildInspector(); showSelected(); changed({ now: true }); } }),
-      h('button', { class: 'mini-btn danger', text: 'Remove sound', onclick: () => {
-        song.tracks.splice(selected, 1);
-        selected = Math.max(0, Math.min(selected, song.tracks.length - 1));
-        picked = null;
-        buildGrid(); buildInspector(); showSelected(); changed({ now: true });
-      } })));
+      h('button', { class: 'mini-btn danger', text: 'Remove sound', onclick: () => removeTrack(selected) })));
 
   // 2. The math
   const eq = h('textarea', { class: 'eq', spellcheck: 'false', autocomplete: 'off', autocapitalize: 'off', rows: 4, 'aria-label': 'Equation' });
@@ -574,7 +688,7 @@ function buildInspector() {
   eq.addEventListener('input', () => {
     t.equation = eq.value;
     const pe = plots[selected]?.el.querySelector('.plot-eq');
-    if (pe) pe.textContent = `f(τ) = ${t.equation}`;
+    if (pe) pe.replaceChildren(h('i', { text: 'f(τ)' }), ' = ', prettyEq(t.equation, t.params));
     validate(); refresh(); changed();
   });
   const insert = (text) => {
@@ -714,6 +828,7 @@ function placePlayhead(frac) {
 
 function frame() {
   requestAnimationFrame(frame);
+  drawLab();
   const g = scope.getContext('2d');
   const { width: w, height: hgt } = scope;
   g.clearRect(0, 0, w, hgt);
@@ -788,12 +903,136 @@ function frame() {
   }
 }
 
+// --- Equation lab: paste an equation, hear it, plot it, add it -----------------------
+
+const LAB_EXAMPLES = [
+  ['Plucked sine', 'sin(TAU*f*tau) * exp(-tau*4)'],
+  ['Kick drop', 'sin(TAU*(50*tau + 4*(1 - exp(-30*tau)))) * exp(-6*tau)'],
+  ['FM bell', 'sin(TAU*f*tau + 3*exp(-2*tau)*sin(TAU*3.5*f*tau)) * exp(-3*tau)'],
+  ['Major chord', '(sin(TAU*f*tau) + sin(TAU*1.26*f*tau) + sin(TAU*1.5*f*tau)) / 3 * exp(-tau*1.5)'],
+  ['Wobble bass', 'saw(f*tau) * (0.5 + 0.5*sin(TAU*4*tau))'],
+  ['Siren', 'sin(TAU*f*tau + 150*sin(TAU*1.5*tau))'],
+  ['Laser', 'sqr(1800*tau - 5000*tau^2) * exp(-tau*6)'],
+  ['Noise hat', 'noise() * exp(-tau*40)'],
+];
+const lab = { eq: $('#lab-eq'), note: $('#lab-note'), len: $('#lab-len'), status: $('#lab-status'), canvas: $('#lab-plot'), cache: null, play: null, ctx: null, src: null };
+
+/** Compile the lab equation; unknown names become parameters set to 1. */
+function labParse() {
+  const equation = lab.eq.value.trim();
+  const params = {};
+  for (let k = 0; k < 8; k++) {
+    try {
+      compile(equation, Object.keys(params));
+      return { equation, params, error: null };
+    } catch (e) {
+      if (!(e instanceof EquationError)) throw e;
+      const m = /^Unknown name "(\w+)"$/.exec(e.message);
+      if (m && isParamName(m[1])) { params[m[1]] = 1; continue; }
+      return { equation, params, error: e.message };
+    }
+  }
+  return { equation, params, error: 'Too many unknown names' };
+}
+
+function labUpdate() {
+  const { params, error } = labParse();
+  const f = noteToFreq(lab.note.value);
+  lab.status.classList.toggle('bad', !!error);
+  const extra = Object.keys(params).length ? ` · ${Object.keys(params).join(', ')} = 1 (add it to the beat to get a knob)` : '';
+  lab.status.textContent = error ?? `✓ Plotted over ${lab.len.value} s at ${lab.note.value} (${Math.round(f)} Hz)${extra}`;
+  $('#lab-play').disabled = !!error;
+  $('#lab-add').disabled = !!error;
+  lab.cache = null;
+}
+
+function drawLab() {
+  const { equation, params, error } = labParse();
+  const secs = +lab.len.value;
+  const key = `${equation}|${lab.note.value}|${secs}|${lab.canvas.clientWidth}x${lab.canvas.clientHeight}|${song.bpm}`;
+  if (lab.cache?.key !== key) {
+    const samples = error ? null : sampleCurve(equation, params, noteToFreq(lab.note.value), secs, Math.max(800, lab.canvas.clientWidth * 8));
+    lab.cache = { key, ...renderPlot(lab.canvas, samples, secs, '#00e5ff') };
+  }
+  let tau = null;
+  if (lab.play) {
+    tau = lab.play.ctx.currentTime - lab.play.start;
+    if (tau > secs) { lab.play = null; tau = null; }
+  }
+  drawPlot(lab.canvas, lab.cache, tau);
+}
+
+$('#lab-play').addEventListener('click', async () => {
+  const { equation, params, error } = labParse();
+  if (error) return;
+  const ctx = player.ctx ?? (lab.ctx ??= new AudioContext());
+  await ctx.resume();
+  const len = +lab.len.value;
+  const { left, right } = renderSong({
+    bpm: song.bpm, duration: len, fadeOut: 0.02,
+    tracks: [{ name: 'Lab', equation, params, at: [0], note: lab.note.value, len, gain: 0.9 }],
+  }, { sampleRate: ctx.sampleRate });
+  const buffer = ctx.createBuffer(2, left.length, ctx.sampleRate);
+  buffer.copyToChannel(left, 0);
+  buffer.copyToChannel(right, 1);
+  try { lab.src?.stop(); } catch {}
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  const g = ctx.createGain();
+  g.gain.value = +$('#volume').value;
+  src.connect(g).connect(ctx.destination);
+  src.start();
+  lab.src = src;
+  lab.play = { ctx, start: ctx.currentTime };
+});
+
+$('#lab-add').addEventListener('click', () => {
+  const { equation, params, error } = labParse();
+  if (error || song.tracks.length >= 16) return;
+  const note = lab.note.value;
+  const usesPitch = /\bf\b/.test(equation);
+  song.tracks.push({
+    name: 'Lab sound', equation, params,
+    ranges: Object.fromEntries(Object.keys(params).map((k) => [k, [0, 10]])),
+    pattern: usesPitch ? `${note} . . . . . . . ${note} . . . . . . .` : 'x.......x.......',
+    rate: 4, note, gain: 0.7, pan: 0,
+  });
+  selected = song.tracks.length - 1;
+  picked = null;
+  buildGrid(); buildInspector(); showSelected(); changed({ now: true });
+  $('.seq-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast('Added "Lab sound" to the beat: click its squares to change the rhythm');
+});
+
+for (const el of [lab.eq, lab.note, lab.len]) el.addEventListener('input', labUpdate);
+lab.eq.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#lab-play').click(); });
+for (const [label, eq] of LAB_EXAMPLES) {
+  $('#lab-examples').append(h('button', { text: label, title: eq, onclick: () => { lab.eq.value = eq; labUpdate(); $('#lab-play').click(); } }));
+}
+labUpdate();
+
 // --- Transport and actions ---------------------------------------------------------
 
-function toast(text) {
-  const el = h('div', { class: 'toast', role: 'status', text });
+function toast(text, action) {
+  document.querySelector('.toast')?.remove();
+  const el = h('div', { class: 'toast', role: 'status' }, text);
+  if (action) el.append(h('button', { text: action.label, onclick: () => { el.remove(); action.run(); } }));
   document.body.append(el);
-  setTimeout(() => el.remove(), 2200);
+  setTimeout(() => el.remove(), action ? 6000 : 2200);
+}
+
+/** Remove a sound, with an Undo in the toast. */
+function removeTrack(i) {
+  const [gone] = song.tracks.splice(i, 1);
+  if (!gone) return;
+  selected = Math.max(0, Math.min(selected > i ? selected - 1 : selected, song.tracks.length - 1));
+  picked = null;
+  buildGrid(); buildInspector(); showSelected(); changed({ now: true });
+  toast(`Removed ${gone.name}`, { label: 'Undo', run: () => {
+    song.tracks.splice(Math.min(i, song.tracks.length), 0, gone);
+    selected = i;
+    buildGrid(); buildInspector(); showSelected(); changed({ now: true });
+  } });
 }
 
 async function play() {

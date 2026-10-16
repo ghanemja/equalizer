@@ -14,7 +14,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0b10'/%3E%3Cpath d='M6 32 Q14 8 22 32 T38 32 T54 32' fill='none' stroke='%2300e5ff' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=STIX+Two+Text:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="./studio.css?v=dev">
 </head>
 <body>
@@ -43,6 +43,23 @@
 
   <main class="layout">
    <div class="col-main">
+    <section class="lab" aria-label="Equation lab">
+      <div class="lab-head">
+        <h2>Equation lab</h2>
+        <p>Paste any equation and hear how it sounds. <i>τ</i> is time since the note started, <i>f</i> is its pitch.</p>
+      </div>
+      <div class="lab-row">
+        <label class="lab-eq"><span class="lab-fx"><i>f</i>(<i>τ</i>) =</span><input id="lab-eq" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Equation to try" value="sin(TAU*f*tau) * exp(-tau*4)"></label>
+        <label class="lcd small"><span>Note</span><select id="lab-note" aria-label="Note"><option>C2</option><option>E2</option><option>A2</option><option>C3</option><option>E3</option><option selected>A3</option><option>C4</option><option>E4</option><option>A4</option><option>C5</option><option>E5</option><option>A5</option><option>C6</option></select></label>
+        <label class="lcd small"><span>Length</span><select id="lab-len" aria-label="Length in seconds"><option value="0.5">0.5 s</option><option value="1" selected>1 s</option><option value="2">2 s</option><option value="4">4 s</option></select></label>
+        <button class="btn play-lab" id="lab-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>Hear it</button>
+        <button class="btn accent" id="lab-add">+ Add to beat</button>
+      </div>
+      <div class="lab-status" id="lab-status" role="status"></div>
+      <div class="lab-examples" id="lab-examples"><span>Try:</span></div>
+      <canvas id="lab-plot" aria-label="Plot of the equation"></canvas>
+    </section>
+
     <section class="tips" id="tips" aria-label="How to use">
       <ol>
         <li><b>Pick a song</b> or start blank.</li>
