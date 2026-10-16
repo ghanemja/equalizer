@@ -1,5 +1,6 @@
 import {
   compile, EquationError, isParamName, noteToFreq, parsePattern, paramValues, renderSong, toWav, Player, VARIABLES, FUNCTIONS, CONSTANTS,
+  triggers, songDuration,
 } from './src/equalizer.js?v=dev';
 import { INSTRUMENTS, SONGS, byId, track as makeTrack } from './src/presets.js?v=dev';
 
@@ -26,6 +27,8 @@ let selected = 0;        // selected track index
 let picked = null;       // { track, token } picked step in a note row
 let rows = [];           // per track: { el, cells, vu, track }
 let stemIndex = [];      // song track index -> index in rendered stems
+let plots = [];          // math monitor: per track { el, canvas, label, cache }
+let triggerCache = null; // per track: when it fires in the loop
 
 // --- Song state ---------------------------------------------------------------------
 
@@ -97,6 +100,7 @@ function playable() {
 
 let renderTimer;
 function changed({ now = false } = {}) {
+  triggerCache = null;
   clearTimeout(renderTimer);
   const go = () => {
     try { localStorage.setItem('eq-song', JSON.stringify(song)); } catch {}
@@ -279,6 +283,7 @@ function buildGrid() {
     grid.append(h('div', { class: 'row add-row' }, h('div', { class: 'head' }, add), h('div', { class: 'hint', text: 'Every sound is an equation. Pick one to add a row.' }), h('div')));
   }
   grid.append(h('div', { class: 'playhead', id: 'playhead' }));
+  buildMonitor();
   markSelected();
 }
 
@@ -289,7 +294,7 @@ function buildRow(t, i) {
     t.name, h('small', { text: soundName(t).replace(/^.*? · /, '') }));
   const mute = h('button', { class: `chip mute${t.mute ? ' on' : ''}`, title: 'Mute', 'aria-pressed': String(!!t.mute), text: 'M' });
   const solo = h('button', { class: `chip solo${t.solo ? ' on' : ''}`, title: 'Solo', 'aria-pressed': String(!!t.solo), text: 'S' });
-  mute.addEventListener('click', () => { t.mute = !t.mute; mute.classList.toggle('on', t.mute); mute.setAttribute('aria-pressed', String(t.mute)); el.classList.toggle('muted', t.mute); changed({ now: true }); });
+  mute.addEventListener('click', () => { t.mute = !t.mute; mute.classList.toggle('on', t.mute); mute.setAttribute('aria-pressed', String(t.mute)); el.classList.toggle('muted', t.mute); plots[i]?.el.classList.toggle('muted', t.mute); changed({ now: true }); });
   solo.addEventListener('click', () => { t.solo = !t.solo; solo.classList.toggle('on', t.solo); solo.setAttribute('aria-pressed', String(t.solo)); changed({ now: true }); });
 
   const cells = h('div', { class: 'cells' });
@@ -368,6 +373,123 @@ function select(i) {
 
 function markSelected() {
   rows.forEach((r, i) => r.el.classList.toggle('selected', i === selected));
+  plots.forEach((p, i) => p.el.classList.toggle('selected', i === selected));
+}
+
+// --- Math monitor: every sound's equation, plotted and animated ---------------------
+
+const PLOT_SECONDS = { drums: 0.5, fx: 0.5, bass: 0.5, keys: 0.5, pads: 2 };
+
+function freqName(f) {
+  const midi = Math.round(69 + 12 * Math.log2(f / 440));
+  return NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+function defaultFreq(t) {
+  const first = tokensOf(t).toks.find(isNote);
+  return (first && noteToFreq(first.split('+')[0])) || noteToFreq(t.note ?? 'A2');
+}
+
+function buildMonitor() {
+  const box = $('#plots');
+  box.textContent = '';
+  plots = song.tracks.map((t, i) => {
+    const label = h('span');
+    const canvas = h('canvas', { 'aria-hidden': 'true' });
+    const el = h('button', { class: `plot${t.mute ? ' muted' : ''}`, 'data-kind': kindOf(t), title: `Edit ${t.name}`, onclick: () => select(i) },
+      h('div', { class: 'plot-top' }, h('span', { class: 'dot' }), h('b', { text: t.name }), label),
+      h('div', { class: 'plot-eq', text: `f(τ) = ${t.equation}` }),
+      canvas);
+    box.append(el);
+    return { el, canvas, label, cache: null, track: t };
+  });
+}
+
+/** Curve images for one sound at one pitch: a dim full curve and a bright copy for the played part. */
+function curveFor(p, t, f) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.round(p.canvas.clientWidth * dpr)), hgt = Math.max(1, Math.round(p.canvas.clientHeight * dpr));
+  const key = `${t.equation}|${JSON.stringify(t.params)}|${f}|${w}x${hgt}|${song.bpm}`;
+  if (p.cache?.key === key) return p.cache;
+  p.canvas.width = w; p.canvas.height = hgt;
+  const secs = PLOT_SECONDS[kindOf(t)];
+  const per = 4;
+  let samples = new Float32Array(w * per);
+  try {
+    const fn = compile(t.equation, Object.keys(t.params));
+    const pv = Object.values(paramValues(t.params));
+    for (let i = 0; i < samples.length; i++) {
+      const tau = (i / samples.length) * secs;
+      const v = fn(tau, tau, f, tau * song.bpm / 60, 0, 0, 0.5, song.bpm, ...pv);
+      samples[i] = Number.isFinite(v) ? Math.max(-1.2, Math.min(1.2, v)) : 0;
+    }
+  } catch { samples = null; }
+  const color = getComputedStyle(p.el).getPropertyValue('--c').trim() || '#00e5ff';
+  const draw = (alpha, glow) => {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = hgt;
+    const g = c.getContext('2d');
+    if (!samples) return c;
+    g.fillStyle = color;
+    g.globalAlpha = alpha;
+    if (glow) { g.shadowColor = color; g.shadowBlur = 8; }
+    for (let x = 0; x < w; x++) {
+      let lo = Infinity, hi = -Infinity;
+      for (let k = 0; k < per; k++) { const v = samples[x * per + k]; if (v < lo) lo = v; if (v > hi) hi = v; }
+      const y1 = hgt / 2 - hi * hgt * 0.4, y2 = hgt / 2 - lo * hgt * 0.4;
+      g.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+    }
+    return c;
+  };
+  p.cache = { key, w, hgt, secs, samples, dim: draw(0.28, false), bright: draw(1, true), color };
+  return p.cache;
+}
+
+function computeTriggers() {
+  const dur = songDuration(song);
+  triggerCache = song.tracks.map((t) => {
+    if (problem(t)) return [];
+    try { return triggers(t, song, dur); } catch { return []; }
+  });
+}
+
+function updateMonitor(pos) {
+  if (!plots.length) return;
+  if (pos != null && !triggerCache) computeTriggers();
+  plots.forEach((p, i) => {
+    const t = song.tracks[i];
+    if (!t || p.track !== t) return;
+    let hit = null;
+    if (pos != null) {
+      for (const tr of triggerCache[i] ?? []) {
+        if (tr.time > pos) break;
+        if (pos < tr.end + 0.004) hit = tr;
+      }
+    }
+    const f = hit ? hit.notes[0] : defaultFreq(t);
+    const c = curveFor(p, t, f);
+    const g = p.canvas.getContext('2d');
+    const { w, hgt } = c;
+    g.clearRect(0, 0, w, hgt);
+    // axes: zero line and quarter-time ticks
+    g.fillStyle = 'rgba(255,255,255,0.07)';
+    g.fillRect(0, Math.round(hgt / 2), w, 1);
+    for (let k = 1; k < 4; k++) g.fillRect(Math.round((w * k) / 4), hgt - 5, 1, 5);
+    g.drawImage(c.dim, 0, 0);
+    const tau = hit ? pos - hit.time : null;
+    if (tau != null && tau <= c.secs) {
+      const x = Math.max(1, Math.round((tau / c.secs) * w));
+      g.drawImage(c.bright, 0, 0, x, hgt, 0, 0, x, hgt);
+      g.fillStyle = '#fff';
+      g.shadowColor = c.color; g.shadowBlur = 12;
+      g.fillRect(x - 1, 0, 2, hgt);
+      const v = c.samples ? c.samples[Math.min(c.samples.length - 1, Math.floor((tau / c.secs) * c.samples.length))] : 0;
+      g.beginPath(); g.arc(x, hgt / 2 - v * hgt * 0.4, 3.5 * (w / p.canvas.clientWidth), 0, Math.PI * 2); g.fill();
+      g.shadowBlur = 0;
+    }
+    p.el.classList.toggle('hit', tau != null && tau < 0.09);
+    const status = tau != null ? `τ ${tau.toFixed(2)}s${isMelodic(t) ? ` · ${freqName(f)}` : ''}` : `${c.secs}s window`;
+    if (p.label.textContent !== status) p.label.textContent = status;
+  });
 }
 
 // --- Inspector ----------------------------------------------------------------------
@@ -390,6 +512,8 @@ function buildInspector() {
     t.name = nameInput.value;
     const r = rows[selected];
     if (r) r.el.querySelector('.row-name').firstChild.textContent = t.name;
+    const pb = plots[selected]?.el.querySelector('b');
+    if (pb) pb.textContent = t.name;
     showSelected(); changed();
   });
   const soundPick = instrumentSelect(t, (id) => {
@@ -447,7 +571,12 @@ function buildInspector() {
       } }));
     }
   };
-  eq.addEventListener('input', () => { t.equation = eq.value; validate(); refresh(); changed(); });
+  eq.addEventListener('input', () => {
+    t.equation = eq.value;
+    const pe = plots[selected]?.el.querySelector('.plot-eq');
+    if (pe) pe.textContent = `f(τ) = ${t.equation}`;
+    validate(); refresh(); changed();
+  });
   const insert = (text) => {
     const s = eq.selectionStart ?? eq.value.length, e = eq.selectionEnd ?? s;
     eq.setRangeText(text, s, e, 'end');
@@ -630,6 +759,7 @@ function frame() {
         if (c?.classList.contains('on')) { c.classList.add('now'); r.nowCell = c; } else r.nowCell = null;
       }
     }
+    updateMonitor(pos % loop);
     rows.forEach((r, i) => {
       const stem = player.stems?.[stemIndex[i]];
       let rms = 0;
@@ -641,6 +771,7 @@ function frame() {
       r.vu.style.width = `${Math.min(100, rms * 260)}%`;
     });
   } else {
+    updateMonitor(null);
     const t = song.tracks[selected];
     if (t && !problem(t)) {
       const s = voiceSamples(t, 600, { drums: 0.4, fx: 0.4, bass: 0.05, keys: 0.03, pads: 0.03 }[kindOf(t)]);

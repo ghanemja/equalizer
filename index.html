@@ -41,7 +41,8 @@
     </div>
   </header>
 
-  <main>
+  <main class="layout">
+   <div class="col-main">
     <section class="tips" id="tips" aria-label="How to use">
       <ol>
         <li><b>Pick a song</b> or start blank.</li>
@@ -91,6 +92,15 @@
         </div>
       </details>
     </section>
+   </div>
+
+    <aside class="monitor" aria-label="Math monitor">
+      <div class="monitor-head">
+        <h2>Math monitor</h2>
+        <p>Every sound's equation, plotted over time since its note started. The bright part is playing right now.</p>
+      </div>
+      <div class="plots" id="plots"></div>
+    </aside>
   </main>
 
   <footer>

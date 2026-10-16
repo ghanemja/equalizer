@@ -91,7 +91,33 @@ code { font-family: var(--mono); font-size: .88em; color: var(--cyan); backgroun
 .vol svg { width: 20px; height: 20px; fill: currentColor; }
 .vol input { width: 90px; accent-color: var(--cyan); }
 
-main { padding: 0 12px; display: grid; gap: 12px; }
+main { padding: 0 12px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
+.col-main { display: grid; gap: 12px; min-width: 0; }
+
+/* --- Math monitor (right column) --- */
+.monitor {
+  position: sticky; top: 96px; max-height: calc(100vh - 108px); overflow-y: auto; display: grid; gap: 10px; align-content: start;
+  padding: 14px; border-radius: 16px; border: 1px solid var(--line);
+  background: repeating-linear-gradient(90deg, rgb(255 255 255 / .012) 0 1px, transparent 1px 3px), linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: 0 1px 0 rgb(255 255 255 / .05) inset, 0 20px 40px -24px #000;
+}
+.monitor-head h2 { margin: 0; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); }
+.monitor-head p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.plots { display: grid; gap: 8px; }
+.plot {
+  display: grid; gap: 4px; padding: 8px 10px 10px; border-radius: 12px; cursor: pointer; text-align: left;
+  border: 1px solid #22222e; background: #07070b; transition: border-color .15s, box-shadow .15s;
+}
+.plot:hover { border-color: #33334a; }
+.plot.selected { border-color: color-mix(in srgb, var(--c) 60%, transparent); }
+.plot.hit { box-shadow: 0 0 0 1px var(--c), 0 0 22px -6px var(--c); }
+.plot-top { display: flex; align-items: baseline; gap: 8px; }
+.plot-top b { font-size: 13px; }
+.plot-top span:last-child { margin-left: auto; font: 600 10px/1 var(--mono); color: var(--muted); }
+.plot-eq { font: 500 10.5px/1.35 var(--mono); color: #9fa3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plot canvas { width: 100%; height: 74px; display: block; }
+.plot.muted { opacity: .4; }
 
 /* --- Tips --- */
 .tips { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-radius: 14px; border-color: rgb(0 229 255 / .35); }
@@ -119,7 +145,7 @@ main { padding: 0 12px; display: grid; gap: 12px; }
 
 /* --- Step grid --- */
 .seq-panel { border-radius: 16px; padding: 10px 0 6px; overflow-x: auto; }
-.grid { position: relative; min-width: calc(var(--head) + var(--tail) + var(--cols, 64) * 15px + 24px); padding: 0 12px; }
+.grid { position: relative; min-width: calc(var(--head) + var(--tail) + var(--cols, 64) * 12px + 24px); padding: 0 12px; }
 .row { display: grid; grid-template-columns: var(--head) 1fr var(--tail); align-items: center; min-height: 44px; }
 .row + .row { border-top: 1px solid #1d1d28; }
 .row .head {
@@ -267,6 +293,11 @@ footer a { color: var(--cyan); }
   box-shadow: 0 0 20px rgb(0 229 255 / .3); font-size: 14px;
 }
 
+@media (max-width: 1250px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .monitor { position: static; max-height: none; }
+  .plots { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+}
 @media (max-width: 1100px) {
   .inspector { grid-template-columns: 1fr 1fr; }
   .inspector .insp-card:first-child { grid-column: 1 / -1; }
