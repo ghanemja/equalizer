@@ -1,7 +1,7 @@
 import {
   compile, EquationError, isParamName, noteToFreq, parsePattern, paramValues, renderSong, toWav, Player, VARIABLES, FUNCTIONS, CONSTANTS,
-} from './src/equalizer.js';
-import { INSTRUMENTS, SONGS, byId, track as makeTrack } from './src/presets.js';
+} from './src/equalizer.js?v=dev';
+import { INSTRUMENTS, SONGS, byId, track as makeTrack } from './src/presets.js?v=dev';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, props = {}, ...kids) => {
