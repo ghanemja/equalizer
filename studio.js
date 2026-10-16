@@ -849,6 +849,20 @@ function placePlayhead(frac) {
   ph.style.left = `${cells.left - grid.left + frac * cells.width}px`;
 }
 
+// On phones one bar fills the grid; turn the page as the playhead moves on, unless the
+// listener has just swiped to look at another bar.
+const phone = matchMedia('(max-width: 700px)');
+const seqPanel = $('.seq-panel');
+let swipedAt = 0;
+for (const ev of ['touchstart', 'pointerdown', 'wheel']) seqPanel.addEventListener(ev, () => { swipedAt = performance.now(); }, { passive: true });
+function followBar(col) {
+  if (!phone.matches || performance.now() - swipedAt < 4000) return;
+  const cells = $('#grid .ruler .cells');
+  if (!cells) return;
+  const left = Math.floor(col / 16) * cells.getBoundingClientRect().width * 16 / totalCols();
+  if (Math.abs(seqPanel.scrollLeft - left) > 2) seqPanel.scrollTo({ left, behavior: 'smooth' });
+}
+
 function frame() {
   requestAnimationFrame(frame);
   drawLab();
@@ -891,6 +905,7 @@ function frame() {
     const col = Math.floor(pos / (spb / 4)) % totalCols();
     if (col !== lastCol) {
       lastCol = col;
+      followBar(col);
       for (const r of rows) {
         r.nowCell?.classList.remove('now');
         const c = r.cellEls?.[Math.floor(col / r.span)];
@@ -988,6 +1003,7 @@ function drawLab() {
 $('#lab-play').addEventListener('click', async () => {
   const { equation, params, error } = labParse();
   if (error) return;
+  unlockAudio();
   const ctx = player.ctx ?? (lab.ctx ??= new AudioContext());
   await ctx.resume();
   const len = +lab.len.value;
@@ -1058,7 +1074,21 @@ function removeTrack(i) {
   } });
 }
 
+// iPhones play Web Audio on the ringer channel, so the silent switch mutes it. Ask for media
+// playback instead (Safari 17+); older iOS needs a silent <audio> loop started from a tap.
+try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+let silentLoop = null;
+function unlockAudio() {
+  if (navigator.audioSession || silentLoop) return;
+  const quiet = new Float32Array(4410);
+  silentLoop = new Audio(URL.createObjectURL(new Blob([toWav(quiet, quiet, 44100)], { type: 'audio/wav' })));
+  silentLoop.loop = true;
+  silentLoop.setAttribute('playsinline', '');
+  silentLoop.play().catch(() => { silentLoop = null; });
+}
+
 async function play() {
+  unlockAudio();
   await player.play(playable());
   player.volume = +$('#volume').value;
   $('#play').classList.add('on');
@@ -1170,14 +1200,19 @@ requestAnimationFrame(frame);
   const disarm = () => {
     armed = false;
     pill.remove();
-    for (const ev of ['pointerdown', 'keydown']) document.removeEventListener(ev, onFirst, true);
+    for (const ev of UNLOCK_EVENTS) document.removeEventListener(ev, onFirst, true);
   };
+  // iOS only lets audio start from a tap (touchend or click), not from touchstart or pointerdown,
+  // and not from the touchend of a scroll, so stay armed until the audio is actually running.
+  const UNLOCK_EVENTS = ['touchend', 'click', 'keydown'];
+  let starting = null;
   const onFirst = (e) => {
     if (!armed) return;
     // Let controls that make their own sound (Play, the equation lab) do their thing.
-    const own = e.target.closest?.('#play, .lab');
-    disarm();
-    if (!own && !player.playing) play();
+    if (e.target.closest?.('#play, .lab') || player.playing) return disarm();
+    unlockAudio();
+    if (starting) { player.ctx?.resume(); return; }
+    starting = play().then(disarm);
   };
   try {
     const probe = new AudioContext();
@@ -1186,5 +1221,5 @@ requestAnimationFrame(frame);
     if (allowed) { disarm(); play(); return; }
   } catch {}
   document.body.append(pill);
-  for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, onFirst, true);
+  for (const ev of UNLOCK_EVENTS) document.addEventListener(ev, onFirst, true);
 })();

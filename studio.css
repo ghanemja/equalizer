@@ -350,16 +350,52 @@ footer a { color: var(--cyan); }
   .inspector .insp-card:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 700px) {
-  :root { --head: 176px; --tail: 56px; }
-  .lab-row .btn { flex: 1; }
-  .console { position: static; margin: 8px; padding: 10px; gap: 10px; }
+  /* Phones: the fun parts first (visualizer, beat, plots), then the editors. */
+  :root { --head: 104px; --tail: 0px; }
+  main { padding: 0 8px; }
+  .layout { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .col-main { display: contents; }
+  .screen { order: 1; height: 120px; }
+  .seq-panel { order: 2; }
+  .monitor { order: 3; padding: 10px; }
+  .tips { order: 4; }
+  .inspector { order: 5; grid-template-columns: 1fr; }
+  .lab { order: 6; }
+  .cheats { order: 7; }
+
+  .console { position: static; margin: 8px; padding: 10px; gap: 8px; }
   .brand { width: 100%; }
-  .transport { flex: none; width: 100%; }
-  .lcd.song { min-width: 0; flex: 1 1 170px; }
-  .screen { height: 120px; }
-  .formula { font-size: 12px; }
-  .inspector { grid-template-columns: 1fr; }
-  .tail input[type=range] { display: none; }
-  .tips { flex-direction: column; align-items: stretch; }
+  .brand b { font-size: 19px; }
+  .transport { flex: none; width: 100%; gap: 8px; }
+  .lcd { min-width: 0; padding: 4px 8px 5px; }
+  .lcd input, .lcd select, .lcd output { font-size: 16px; }
+  .lcd.song { flex: 1 1 150px; }
+  .lcd.time { min-width: 80px; }
+  .actions { width: 100%; gap: 6px; }
+  .vol { flex: 1; }
+  .vol input { width: 100%; }
+  .actions .btn { height: 38px; padding: 0 10px; }
+  .actions .btn.icon { padding: 0; min-width: 38px; }
+
+  /* One bar fills the width; swipe (or let the playhead carry you) between bars. */
+  .seq-panel { container-type: inline-size; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; }
+  .grid { min-width: 0; width: calc(var(--head) + var(--cols, 64) / 16 * (100cqw - var(--head) - 8px) + 16px); padding: 0 8px; }
+  .ruler .bar { scroll-snap-align: start; scroll-margin-left: calc(var(--head) + 8px); }
+  .row .tail, .row .chip.solo, .row .chip.del, .row .dot { display: none; }
+  .row .head { gap: 4px; padding-right: 6px; }
+  .row-name { padding-left: 6px; padding-right: 4px; }
   .row-name small { display: none; }
+  .cells { gap: 2px; }
+  .add-row .head { width: calc(100cqw - 16px); background: none; }
+  .add-row select { width: 100%; }
+  .add-row .hint { display: none; }
+  .cell { padding: 0; }
+
+  .plots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plot { padding: 6px 7px 7px; }
+  .plot-eq { font-size: 12px; }
+  .plot canvas { height: 84px; }
+  .formula { font-size: 12px; }
+  .lab-row .btn { flex: 1; }
+  .tips { flex-direction: column; align-items: stretch; }
 }
