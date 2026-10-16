@@ -209,8 +209,10 @@ main { padding: 0 12px; }
 
 .chip {
   width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); cursor: pointer; flex: none; padding: 0;
+  display: inline-grid; place-items: center;
   background: #1c1c27; font: 700 11px/1 var(--mono); color: var(--muted);
 }
+.chip svg { display: block; }
 .chip:hover { color: var(--text); }
 .chip.mute.on { background: #ff4d4d; color: #200; border-color: #ff4d4d; }
 .chip.solo.on { background: var(--amber); color: #201400; border-color: var(--amber); }

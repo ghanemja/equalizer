@@ -287,15 +287,36 @@ function buildGrid() {
   markSelected();
 }
 
+const svgIcon = (body) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const SPEAKER = '<path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>';
+const ICONS = {
+  sound: svgIcon(SPEAKER + '<path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>'),
+  muted: svgIcon(SPEAKER + '<path d="m16 9 6 6m0-6-6 6"/>'),
+  solo: svgIcon('<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5" fill="currentColor"/><rect x="17" y="14" width="4" height="7" rx="1.5" fill="currentColor"/>'),
+};
+
 function buildRow(t, i) {
   const kind = kindOf(t);
   const el = h('div', { class: `row track${t.mute ? ' muted' : ''}`, 'data-kind': kind });
   const name = h('button', { class: 'row-name', title: 'Edit this sound', 'aria-label': `Select ${t.name}`, onclick: () => select(i) },
     t.name, h('small', { text: soundName(t).replace(/^.*? · /, '') }));
-  const mute = h('button', { class: `chip mute${t.mute ? ' on' : ''}`, title: 'Mute', 'aria-pressed': String(!!t.mute), text: 'M' });
-  const solo = h('button', { class: `chip solo${t.solo ? ' on' : ''}`, title: 'Solo', 'aria-pressed': String(!!t.solo), text: 'S' });
-  mute.addEventListener('click', () => { t.mute = !t.mute; mute.classList.toggle('on', t.mute); mute.setAttribute('aria-pressed', String(t.mute)); el.classList.toggle('muted', t.mute); plots[i]?.el.classList.toggle('muted', t.mute); changed({ now: true }); });
-  solo.addEventListener('click', () => { t.solo = !t.solo; solo.classList.toggle('on', t.solo); solo.setAttribute('aria-pressed', String(t.solo)); changed({ now: true }); });
+  const mute = h('button', { class: 'chip mute', 'aria-label': `Mute ${t.name}` });
+  const solo = h('button', { class: 'chip solo', 'aria-label': `Solo ${t.name}` });
+  solo.innerHTML = ICONS.solo;
+  const paintMute = () => {
+    mute.classList.toggle('on', !!t.mute);
+    mute.setAttribute('aria-pressed', String(!!t.mute));
+    mute.title = t.mute ? 'Muted: click to unmute' : 'Click to mute';
+    mute.innerHTML = t.mute ? ICONS.muted : ICONS.sound;
+  };
+  const paintSolo = () => {
+    solo.classList.toggle('on', !!t.solo);
+    solo.setAttribute('aria-pressed', String(!!t.solo));
+    solo.title = t.solo ? 'Solo on: click to hear everything again' : 'Solo: hear only this sound';
+  };
+  paintMute(); paintSolo();
+  mute.addEventListener('click', () => { t.mute = !t.mute; paintMute(); el.classList.toggle('muted', t.mute); plots[i]?.el.classList.toggle('muted', t.mute); changed({ now: true }); });
+  solo.addEventListener('click', () => { t.solo = !t.solo; paintSolo(); changed({ now: true }); });
   const del = h('button', { class: 'chip del', title: `Remove ${t.name}`, 'aria-label': `Remove ${t.name}`, text: '×', onclick: () => removeTrack(i) });
 
   const cells = h('div', { class: 'cells' });
