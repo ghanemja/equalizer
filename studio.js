@@ -320,8 +320,10 @@ function buildRow(t, i) {
   const del = h('button', { class: 'chip del', title: `Remove ${t.name}`, 'aria-label': `Remove ${t.name}`, text: '×', onclick: () => removeTrack(i) });
 
   const cells = h('div', { class: 'cells' });
-  const gain = h('input', { type: 'range', min: 0, max: 1.5, step: 0.01, value: t.gain ?? 0.8, 'aria-label': `${t.name} volume` });
-  gain.addEventListener('input', () => { t.gain = +gain.value; changed(); });
+  const gain = h('input', { type: 'range', min: 0, max: 2.5, step: 0.01, value: t.gain ?? 0.8, 'aria-label': `${t.name} volume` });
+  const gainTitle = () => { gain.title = `Volume ${Math.round(+gain.value * 100)}%`; };
+  gainTitle();
+  gain.addEventListener('input', () => { t.gain = +gain.value; gainTitle(); changed(); });
   const vu = h('i');
   el.append(h('div', { class: 'head' }, h('span', { class: 'dot' }), name, mute, solo, del), cells, h('div', { class: 'tail' }, gain, h('div', { class: 'vu' }, vu)));
   const row = { el, cells, vu, track: t, index: i };

@@ -419,7 +419,7 @@ export class Player {
 
   update(song, restart = false) {
     if (!this.ctx || (!this.source && !restart)) return;
-    const { left, right, duration, stems } = renderSong(song, { sampleRate: this.ctx.sampleRate, stems: true });
+    const { left, right, duration, stems } = renderSong(song, { sampleRate: this.ctx.sampleRate, stems: true, normalize: false });
     const buffer = this.ctx.createBuffer(2, left.length, this.ctx.sampleRate);
     buffer.copyToChannel(left, 0);
     buffer.copyToChannel(right, 1);
