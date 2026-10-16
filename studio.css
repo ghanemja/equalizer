@@ -323,6 +323,15 @@ details.adv[open] summary { margin-bottom: 8px; }
 footer { padding: 10px 16px 30px; text-align: center; color: var(--muted); font-size: 13px; }
 footer a { color: var(--cyan); }
 
+.start-pill {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 40;
+  display: inline-flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--lime); background: #0d1206; color: var(--text); font-weight: 700; font-size: 15px;
+  box-shadow: 0 0 0 0 rgb(182 255 60 / .5), 0 12px 30px -10px #000; animation: pill-pulse 1.8s ease-out infinite;
+}
+.start-pill__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 10px var(--lime); }
+@keyframes pill-pulse { 0% { box-shadow: 0 0 0 0 rgb(182 255 60 / .45), 0 12px 30px -10px #000; } 70%, 100% { box-shadow: 0 0 0 16px rgb(182 255 60 / 0), 0 12px 30px -10px #000; } }
+@media (prefers-reduced-motion: reduce) { .start-pill { animation: none; } }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50;
   padding: 10px 16px; border-radius: 10px; background: #0d0d14; border: 1px solid var(--cyan); color: var(--text);

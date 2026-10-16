@@ -1136,3 +1136,32 @@ load(initial ?? structuredClone(SONGS.house));
 if (!initial) songPick.value = 'house';
 fitCanvas();
 requestAnimationFrame(frame);
+
+// --- Sound on by default ---------------------------------------------------------------
+// Browsers only allow audio after the visitor interacts with the page, so: start
+// right away if autoplay is allowed, otherwise start on the first click, tap or key.
+(function autoStart() {
+  const pill = h('button', { class: 'start-pill', 'aria-label': 'Start the beat' },
+    h('span', { class: 'start-pill__dot' }), 'Tap anywhere to start the beat');
+  let armed = true;
+  const disarm = () => {
+    armed = false;
+    pill.remove();
+    for (const ev of ['pointerdown', 'keydown']) document.removeEventListener(ev, onFirst, true);
+  };
+  const onFirst = (e) => {
+    if (!armed) return;
+    // Let controls that make their own sound (Play, the equation lab) do their thing.
+    const own = e.target.closest?.('#play, .lab');
+    disarm();
+    if (!own && !player.playing) play();
+  };
+  try {
+    const probe = new AudioContext();
+    const allowed = probe.state === 'running';
+    probe.close();
+    if (allowed) { disarm(); play(); return; }
+  } catch {}
+  document.body.append(pill);
+  for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, onFirst, true);
+})();
