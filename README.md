@@ -16,6 +16,13 @@ The studio looks like a DJ console, but every sound is just an equation. Each so
 
 No samples, no dependencies, no build step. Every sound is computed from math, 44,100 times a second.
 
+## Listen
+
+- [Four on the floor](docs/audio/four-on-the-floor.mp3): the studio's default beat (124 bpm, 16 bars)
+- [art-medium theme](docs/audio/art-medium-theme.mp3): the soundtrack of the art-medium promo video
+
+Both were rendered straight from their equations with `examples/render.mjs`, then encoded to MP3.
+
 ## How it works
 
 A song is a tempo plus a list of tracks. Each track is an equation, a step pattern that says when it fires, and its parameters:
