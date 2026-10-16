@@ -1241,35 +1241,78 @@ fitCanvas();
 requestAnimationFrame(frame);
 
 // --- Sound on by default ---------------------------------------------------------------
-// Browsers only allow audio after the visitor interacts with the page, so: start
-// right away if autoplay is allowed, otherwise start on the first click, tap or key.
+// Browsers only allow audio after the visitor interacts with the page, so: start right away
+// if autoplay is allowed, otherwise show a splash whose first tap (or key) drops the beat.
+const APP_NAME = 'equalizer';
+const KIND_COLORS = { drums: '#ff3cac', bass: '#ffb020', keys: '#00e5ff', pads: '#9d7bff', fx: '#b6ff3c' };
+
 (function autoStart() {
-  const pill = h('button', { class: 'start-pill', 'aria-label': 'Start the beat' },
-    h('span', { class: 'start-pill__dot' }), 'Tap anywhere to start the beat');
-  let armed = true;
-  const disarm = () => {
-    armed = false;
-    pill.remove();
-    for (const ev of UNLOCK_EVENTS) document.removeEventListener(ev, onFirst, true);
-  };
-  // iOS only lets audio start from a tap (touchend or click), not from touchstart or pointerdown,
-  // and not from the touchend of a scroll, so stay armed until the audio is actually running.
-  const UNLOCK_EVENTS = ['touchend', 'click', 'keydown'];
-  let starting = null;
-  const onFirst = (e) => {
-    if (!armed) return;
-    // Let controls that make their own sound (Play, the equation lab) do their thing.
-    if (e.target.closest?.('#play, .lab') || player.playing) return disarm();
-    unlockAudio();
-    if (starting) { player.ctx?.resume(); return; }
-    starting = play().then(disarm);
-  };
   try {
     const probe = new AudioContext();
     const allowed = probe.state === 'running';
     probe.close();
-    if (allowed) { disarm(); play(); return; }
+    if (allowed) { play(); return; }
   } catch {}
-  document.body.append(pill);
-  for (const ev of UNLOCK_EVENTS) document.addEventListener(ev, onFirst, true);
+
+  const lead = song.tracks.find((t) => !problem(t) && kindOf(t) !== 'fx') ?? song.tracks[0];
+  const canvas = h('canvas', { class: 'splash__waves', 'aria-hidden': 'true' });
+  const go = h('button', { class: 'splash__go', type: 'button' });
+  go.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>Tap to drop the beat';
+  const splash = h('div', { class: 'splash', role: 'dialog', 'aria-modal': 'true', 'aria-label': `Start ${song.title}` },
+    canvas,
+    h('div', { class: 'splash__card' },
+      h('div', { class: 'splash__brand', text: APP_NAME }),
+      h('div', { class: 'splash__song', text: song.title }),
+      lead ? h('div', { class: 'splash__eq' }, h('i', { text: 'f(τ)' }), ' = ', prettyEq(lead.equation, lead.params)) : null,
+      go,
+      h('p', { class: 'splash__note', text: 'Every sound is a math equation. No samples.' })));
+  document.body.append(splash);
+  document.documentElement.classList.add('splash-open');
+
+  // The waves are this song's own equations, drawn and slowly scrolling.
+  const waves = song.tracks.filter((t) => !problem(t)).slice(0, 6).map((t) => {
+    const kind = kindOf(t);
+    try { return { color: KIND_COLORS[kind], s: voiceSamples(t, 480, { drums: 0.35, fx: 0.4, bass: 0.06, keys: 0.03, pads: 0.03 }[kind]) }; }
+    catch { return null; }
+  }).filter(Boolean);
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let raf = 0;
+  const draw = (now) => {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const w = canvas.width = canvas.clientWidth * dpr, hgt = canvas.height = canvas.clientHeight * dpr;
+    const g = canvas.getContext('2d');
+    g.lineWidth = 2.2 * dpr;
+    g.globalCompositeOperation = 'lighter';
+    waves.forEach(({ color, s }, i) => {
+      const y0 = hgt * (0.18 + 0.64 * (i + 0.5) / waves.length), amp = hgt / (waves.length + 1) * 0.55;
+      const shift = still ? 0 : (now / 1000) * (40 + i * 13);
+      g.strokeStyle = color; g.shadowColor = color; g.shadowBlur = 14 * dpr; g.globalAlpha = 0.55;
+      g.beginPath();
+      for (let x = 0; x <= w; x += 2 * dpr) {
+        const k = Math.floor((x / dpr + shift) % s.length);
+        const y = y0 - s[k] * amp * (0.85 + 0.15 * Math.sin(now / 700 + i));
+        x ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.stroke();
+    });
+    if (!still) raf = requestAnimationFrame(draw);
+  };
+  raf = requestAnimationFrame(draw);
+
+  // iOS only lets audio start from a real tap (click/touchend) or a key press.
+  let started = false;
+  const start = (e) => {
+    if (started) return;
+    started = true;
+    e?.preventDefault();
+    unlockAudio();
+    play();
+    splash.classList.add('splash--out');
+    document.documentElement.classList.remove('splash-open');
+    document.removeEventListener('keydown', onKey, true);
+    setTimeout(() => { cancelAnimationFrame(raf); splash.remove(); }, 450);
+  };
+  const onKey = (e) => { if (!e.metaKey && !e.ctrlKey && !e.altKey) start(e); };
+  splash.addEventListener('click', start);
+  document.addEventListener('keydown', onKey, true);
 })();
