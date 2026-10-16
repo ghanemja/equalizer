@@ -202,50 +202,9 @@ export function bassline(list, rhythm, octave = -2) {
 }
 
 export const SONGS = {
-  house: {
-    title: 'Four on the floor', bpm: 124, bars: 4,
-    tracks: [
-      track('kick'),
-      track('clap'),
-      track('hat', { pattern: '..x...x...x...x.', params: { decay: 30 } }),
-      track('shaker', { gain: 0.18 }),
-      track('sawbass', { pattern: bassline(['C', 'Am', 'F', 'G'], '. . x .') }),
-      track('pluck', { pattern: arp(['C', 'Am', 'F', 'G']), pan: 0.2, echo: 0.25 }),
-      track('supersaw', { pattern: chords(['C', 'Am', 'F', 'G']) }),
-    ],
-  },
-  painted: {
-    title: 'Painted (art-medium theme)', bpm: 120, bars: 4,
-    tracks: [
-      track('kick'),
-      track('clap', { gain: 0.5 }),
-      track('hat', { name: 'Open hat', pattern: '..x...x...x...x.', params: { metal: 0, decay: 22 }, hp: 6500, gain: 0.32 }),
-      track('hat', { pattern: 'x.x.x.x.x.x.x.x.', params: { metal: 0, decay: 55 }, hp: 7000, gain: 0.16, pan: 0.2 }),
-      track('sawbass', { pattern: bassline(['C', 'Am', 'F', 'G'], '. . x .'), params: { sub: 1 }, gain: 0.65 }),
-      track('pluck', { name: 'Pluck', pattern: arp(['C', 'Am', 'F', 'G']), params: { bright: 0.3 }, gain: 0.42, pan: -0.2, echo: 0.22 }),
-      track('supersaw', { pattern: chords(['C', 'Am', 'F', 'G']), lp: 1700, gain: 0.4 }),
-      track('splat', { name: 'Splat', pattern: 'x' + '.'.repeat(63), gain: 0.45 }),
-      track('pop', { name: 'Pops', pattern: '.'.repeat(28) + 'x.x.' + '.'.repeat(32), gain: 0.35 }),
-      // Starts 3 steps (0.375 s) before the loop ends, so it peaks right on the downbeat.
-      track('whoosh', { name: 'Whoosh', pattern: '.'.repeat(61) + 'x..', gain: 0.45 }),
-    ],
-  },
-  synthwave: {
-    title: 'Night drive', bpm: 100, bars: 4,
-    tracks: [
-      track('kick', { params: { decay: 8 } }),
-      track('snare', { params: { tone: 0.45, decay: 13 }, echo: 0.2, gain: 0.6 }),
-      track('hat', { pattern: 'x.x.x.x.x.x.x.x.', params: { decay: 60 }, gain: 0.28 }),
-      track('sawbass', { pattern: bassline(['Am', 'F', 'C', 'G'], 'x .'), params: { sub: 0.4, decay: 4 }, lp: 900, gain: 0.55 }),
-      track('lead', {
-        pattern: 'E5 . . . A5 . . . G5 . E5 . . . D5 . C5 . . . . . . . A4 . C5 . D5 . . . E5 . . . G5 . . . E5 . D5 . C5 . . . D5 . . . . . B4 . D5 . . . G5 . . .',
-        params: { vib: 0.12, decay: 1.2 }, echo: 0.3, gain: 0.28,
-      }),
-      track('choir', { pattern: chords(['Am', 'F', 'C', 'G']), gain: 0.4 }),
-    ],
-  },
+  // tanh(drive * sin(...)): the 808 kick is a sine pushed through the hyperbolic tangent.
   trap: {
-    title: 'Midnight 808', bpm: 140, bars: 4,
+    title: 'Hyperbolic 808', bpm: 140, bars: 4,
     tracks: [
       track('kick808', { pattern: 'x.........x.....x.........x..x..' }),
       track('clap', { pattern: '........x.......', gain: 0.5 }),
@@ -258,8 +217,37 @@ export const SONGS = {
       track('choir', { pattern: chords(['Am', 'F', 'C', 'G'], -1), gain: 0.3 }),
     ],
   },
+  // Four on the floor, and floor() is a function too.
+  house: {
+    title: 'Floor Function', bpm: 124, bars: 4,
+    tracks: [
+      track('kick'),
+      track('clap'),
+      track('hat', { pattern: '..x...x...x...x.', params: { decay: 30 } }),
+      track('shaker', { gain: 0.18 }),
+      track('sawbass', { pattern: bassline(['C', 'Am', 'F', 'G'], '. . x .') }),
+      track('pluck', { pattern: arp(['C', 'Am', 'F', 'G']), pan: 0.2, echo: 0.25 }),
+      track('supersaw', { pattern: chords(['C', 'Am', 'F', 'G']) }),
+    ],
+  },
+  // Sawtooth bass and pads: each saw is a Fourier series of sines.
+  synthwave: {
+    title: 'Fourier Drive', bpm: 100, bars: 4,
+    tracks: [
+      track('kick', { params: { decay: 8 } }),
+      track('snare', { params: { tone: 0.45, decay: 13 }, echo: 0.2, gain: 0.6 }),
+      track('hat', { pattern: 'x.x.x.x.x.x.x.x.', params: { decay: 60 }, gain: 0.28 }),
+      track('sawbass', { pattern: bassline(['Am', 'F', 'C', 'G'], 'x .'), params: { sub: 0.4, decay: 4 }, lp: 900, gain: 0.55 }),
+      track('lead', {
+        pattern: 'E5 . . . A5 . . . G5 . E5 . . . D5 . C5 . . . . . . . A4 . C5 . D5 . . . E5 . . . G5 . . . E5 . D5 . C5 . . . D5 . . . . . B4 . D5 . . . G5 . . .',
+        params: { vib: 0.12, decay: 1.2 }, echo: 0.3, gain: 0.28,
+      }),
+      track('choir', { pattern: chords(['Am', 'F', 'C', 'G']), gain: 0.4 }),
+    ],
+  },
+  // The wobble is a saw multiplied by a slow sine: saw(f*tau) * (0.55 + 0.45*sin(TAU*rate*beat)).
   dubstep: {
-    title: 'Wobble lab', bpm: 140, bars: 4,
+    title: 'Sine of the Times', bpm: 140, bars: 4,
     tracks: [
       track('kick', { pattern: 'x.........x.....', params: { decay: 6 } }),
       track('snare', { pattern: '........x.......', params: { tone: 0.3, decay: 10 }, gain: 0.7 }),
@@ -272,8 +260,9 @@ export const SONGS = {
       track('riser', { name: 'Riser', pattern: '.'.repeat(56) + 'x.......', params: { rise: 1 }, gain: 0.3 }),
     ],
   },
+  // A triangle wave with a slow sine wobble on its pitch.
   lofi: {
-    title: 'Lo-fi homework', bpm: 84, bars: 4,
+    title: 'Trig Homework', bpm: 84, bars: 4,
     tracks: [
       track('kick', { pattern: 'x.....x...x.....', params: { decay: 9, punch: 90 } }),
       track('snare', { pattern: '....x.......x...', params: { tone: 0.5, decay: 12 }, lp: 4000 }),
@@ -283,8 +272,9 @@ export const SONGS = {
       track('bell', { pattern: 'E5 . . . . . G5 . . . . . C6 . . . . . . . B5 . . . . . . . . . . .', gain: 0.25 }),
     ],
   },
+  // Square waves: sqr(f*tau, duty).
   chip: {
-    title: 'Level 1-1', bpm: 140, bars: 4,
+    title: 'Square One', bpm: 140, bars: 4,
     tracks: [
       track('kick', { pattern: 'x.......x.x.....', params: { decay: 12 } }),
       track('snare', { pattern: '....x.......x...', params: { tone: 0.2, decay: 25 } }),

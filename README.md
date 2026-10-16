@@ -18,10 +18,11 @@ No samples, no dependencies, no build step. Every sound is computed from math, 4
 
 ## Listen
 
-- [Four on the floor](docs/audio/four-on-the-floor.mp3): the studio's default beat (124 bpm, 16 bars)
+- [Hyperbolic 808](docs/audio/hyperbolic-808.mp3): the studio's default beat (trap, 140 bpm)
+- [Floor Function](docs/audio/four-on-the-floor.mp3): four on the floor (house, 124 bpm, 16 bars)
 - [art-medium theme](docs/audio/art-medium-theme.mp3): the soundtrack of the art-medium promo video
 
-Both were rendered straight from their equations with `examples/render.mjs`, then encoded to MP3.
+All three were rendered straight from their equations with `examples/render.mjs`, then encoded to MP3.
 
 ## How it works
 
@@ -101,7 +102,18 @@ node examples/render.mjs ./my-song.js out.wav   # a module that default-exports 
 
 ## Built-in songs
 
-Four on the floor (house), Painted (the art-medium promo theme, with its splats, pops and whoosh), Night drive (synthwave), Midnight 808 (trap), Wobble lab (dubstep), Lo-fi homework and Level 1-1 (chiptune). Pick one from the Song menu, or render it with `node examples/render.mjs <id>`: `house`, `painted`, `synthwave`, `trap`, `dubstep`, `lofi`, `chip`.
+Each one is named after the math behind its signature sound.
+
+| Song | Style | The math |
+| --- | --- | --- |
+| Hyperbolic 808 (default) | Trap, 140 bpm | The 808 kick is `tanh(drive * sin(...))`, a sine pushed through the hyperbolic tangent |
+| Floor Function | House, 124 bpm | Four on the floor. It's also the theme of the art-medium promo video |
+| Fourier Drive | Synthwave, 100 bpm | Sawtooth bass and pads; every saw is a Fourier series of sines |
+| Sine of the Times | Dubstep, 140 bpm | The wobble is a saw multiplied by a slow sine |
+| Trig Homework | Lo-fi, 84 bpm | A triangle wave with a slow sine wobble on its pitch |
+| Square One | Chiptune, 140 bpm | Square waves, `sqr(f*tau, duty)` |
+
+Pick one from the Song menu, or render it with `node examples/render.mjs <id>` (`trap`, `house`, `synthwave`, `dubstep`, `lofi`, `chip`).
 
 ## Develop
 

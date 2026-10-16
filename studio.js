@@ -103,7 +103,7 @@ function changed({ now = false } = {}) {
   triggerCache = null;
   clearTimeout(renderTimer);
   const go = () => {
-    try { localStorage.setItem('eq-song', JSON.stringify(song)); } catch {}
+    try { localStorage.setItem('eq-song-v2', JSON.stringify(song)); } catch {}
     if (player.playing) player.update(playable());
   };
   if (now) go(); else renderTimer = setTimeout(go, 140);
@@ -1184,9 +1184,9 @@ if (location.hash.startsWith('#s=')) {
     songPick.value = 'shared';
   } catch { toast("That share link couldn't be read"); }
 }
-if (!initial) { try { initial = JSON.parse(localStorage.getItem('eq-song')); } catch {} }
-load(initial ?? structuredClone(SONGS.house));
-if (!initial) songPick.value = 'house';
+if (!initial) { try { initial = JSON.parse(localStorage.getItem('eq-song-v2')); } catch {} }
+load(initial ?? structuredClone(SONGS.trap));
+if (!initial) songPick.value = 'trap';
 fitCanvas();
 requestAnimationFrame(frame);
 
