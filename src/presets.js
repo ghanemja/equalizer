@@ -174,7 +174,7 @@ export function track(id, overrides = {}) {
   const params = {};
   for (const [k, v] of Object.entries(inst.params)) params[k] = pOver[k] ?? v.value;
   const { id: _id, name, kind, params: _p, ...defaults } = inst;
-  return { name, instrument: id, ...defaults, params, ...rest };
+  return { name: name.split(' · ')[0], instrument: id, ...defaults, params, ...rest };
 }
 
 const CHORDS = {

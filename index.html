@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>equalizer · beats from math</title>
-  <meta name="description" content="A DJ studio where every sound is a math equation. Pick equations, turn the knobs, make beats.">
+  <meta name="description" content="A DJ studio where every sound is a math equation. Pick sounds, light up steps, turn the knobs.">
   <meta property="og:title" content="equalizer · beats from math">
   <meta property="og:description" content="A DJ studio where every drum, bass line and melody is a math equation you can tweak.">
   <meta property="og:type" content="website">
@@ -25,42 +25,54 @@
     </div>
 
     <div class="transport">
-      <button class="btn play" id="play" aria-label="Play" title="Play (space)"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg></button>
-      <button class="btn" id="stop" aria-label="Stop" title="Stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg></button>
-      <label class="lcd"><span>BPM</span><input id="bpm" type="number" min="40" max="220" step="1" value="120"></label>
+      <button class="btn play" id="play" aria-label="Play" title="Play / stop (space)"><svg viewBox="0 0 24 24"><path class="i-play" d="M7 4l13 8-13 8z"/><path class="i-stop" d="M6 6h12v12H6z"/></svg><span id="play-label">Play</span></button>
+      <label class="lcd song"><span>Song</span><select id="song"></select></label>
+      <label class="lcd"><span>Tempo</span><input id="bpm" type="number" min="40" max="220" step="1" value="120" aria-label="Tempo in BPM"></label>
       <label class="lcd"><span>Bars</span><select id="bars"><option>1</option><option>2</option><option selected>4</option><option>8</option></select></label>
       <div class="lcd time"><span>Time</span><output id="clock">0:00.0</output></div>
-      <label class="lcd master"><span>Master</span><input id="volume" type="range" min="0" max="1" step="0.01" value="0.85"></label>
     </div>
 
     <div class="actions">
-      <label class="lcd song"><span>Song</span><select id="song"></select></label>
-      <button class="btn text" id="random" title="Randomize every knob">Shuffle knobs</button>
+      <label class="vol" title="Master volume"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="volume" type="range" min="0" max="1" step="0.01" value="0.85" aria-label="Master volume"></label>
+      <button class="btn text" id="random" title="Randomize every sound's knobs">Shuffle</button>
       <button class="btn text" id="export">Export WAV</button>
-      <button class="btn text accent" id="share">Share link</button>
+      <button class="btn text accent" id="share">Share</button>
+      <button class="btn icon" id="help-btn" aria-label="How to use" title="How to use">?</button>
     </div>
   </header>
 
   <main>
+    <section class="tips" id="tips" aria-label="How to use">
+      <ol>
+        <li><b>Pick a song</b> or start blank.</li>
+        <li><b>Press play</b> (or space).</li>
+        <li><b>Click squares</b> to add or remove hits. Lit squares play.</li>
+        <li><b>Click a sound's name</b> to tweak it below. Every knob is a number in its equation.</li>
+      </ol>
+      <button class="tips-close" id="tips-close" aria-label="Hide tips">Got it</button>
+    </section>
+
     <section class="screen" aria-label="Visualizer">
       <canvas id="scope"></canvas>
       <div class="screen-overlay">
         <div class="now" id="now-name">Kick</div>
         <div class="formula" id="now-eq" aria-live="polite"></div>
       </div>
-      <div class="leds" id="leds" aria-hidden="true"></div>
-      <div class="hint" id="hint">Press play. Every sound you hear is an equation below.</div>
     </section>
 
-    <section class="mixer" id="mixer" aria-label="Mixer"></section>
+    <section class="seq-panel" aria-label="Step sequencer">
+      <div class="grid" id="grid"></div>
+    </section>
 
-    <section class="cheats">
-      <details open>
-        <summary>How it works</summary>
+    <section class="inspector" id="inspector" aria-label="Selected sound"></section>
+
+    <section class="cheats" id="cheats">
+      <details>
+        <summary>The math, explained</summary>
         <div class="cheat-grid">
           <div>
-            <h3>Every channel is an equation</h3>
-            <p>Each channel plays its equation every time a step pad is lit. The equation's output is the sound wave: a number between −1 and 1, computed 44,100 times a second. Turn the knobs to change its parameters, or rewrite it.</p>
+            <h3>Every sound is an equation</h3>
+            <p>A sound plays its equation every time one of its squares is lit. The equation's output is the sound wave: a number between −1 and 1, computed 44,100 times a second. The knobs are the numbers in the equation.</p>
             <p>Try <code>sin(TAU * f * tau) * exp(-tau * 8)</code>: a sine wave at the note's pitch that fades out.</p>
           </div>
           <div>
@@ -73,8 +85,8 @@
             <p>Oscillators take a phase in cycles: <code>saw(f*tau)</code>, <code>sqr(f*tau, 0.25)</code>, <code>tri(f*tau)</code>. <code>noise()</code> is white noise. <code>ad(tau, attack, decay)</code> is an envelope. <code>a ^ b</code> is a power, and <code>c ? a : b</code> picks a or b.</p>
           </div>
           <div>
-            <h3>Patterns</h3>
-            <p>Drums: <code>x...x...</code> (x hits, . waits). Notes: <code>C3 . E3 . G3+B3 -</code> (notes or chords joined by +, - stops the note). Click a pad to toggle it; scroll on a note pad to change its pitch.</p>
+            <h3>Patterns as text</h3>
+            <p>Drums: <code>x...x...</code> (x hits, . waits). Notes: <code>C3 . E3 . G3+B3 -</code> (notes or chords joined by +, - stops the note). Each sound's pattern text is under Rhythm.</p>
           </div>
         </div>
       </details>
@@ -84,38 +96,6 @@
   <footer>
     <a href="https://github.com/ghanemja/equalizer">GitHub</a> · MIT · Every sound here is synthesized from math: no samples.
   </footer>
-
-  <template id="strip-tpl">
-    <article class="strip">
-      <div class="strip-head">
-        <span class="dot"></span>
-        <input class="name" aria-label="Channel name" maxlength="24">
-        <button class="chip mute" title="Mute">M</button>
-        <button class="chip solo" title="Solo">S</button>
-        <button class="chip dice" title="Randomize knobs" aria-label="Randomize knobs"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.6"/><circle cx="16" cy="16" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="16" cy="8" r="1.6"/><circle cx="8" cy="16" r="1.6"/></svg></button>
-        <button class="chip remove" title="Remove channel" aria-label="Remove channel">×</button>
-      </div>
-      <select class="inst" aria-label="Equation"></select>
-      <div class="eq-wrap">
-        <textarea class="eq" spellcheck="false" autocomplete="off" autocapitalize="off" rows="3" aria-label="Equation"></textarea>
-        <div class="err" role="status"></div>
-      </div>
-      <canvas class="wave" width="560" height="110" aria-hidden="true"></canvas>
-      <div class="knobs params"></div>
-      <div class="seq-head"><span>Steps</span>
-        <select class="rate" aria-label="Step length">
-          <option value="4">1/16</option><option value="2">1/8</option><option value="1">1/4</option><option value="0.25">1 bar</option>
-        </select>
-      </div>
-      <div class="seq"></div>
-      <input class="pattern" spellcheck="false" aria-label="Pattern">
-      <div class="knobs fx"></div>
-      <div class="fader-row">
-        <input class="gain" type="range" min="0" max="1.5" step="0.01" aria-label="Volume">
-        <div class="vu"><i></i></div>
-      </div>
-    </article>
-  </template>
 
   <script type="module" src="./studio.js"></script>
 </body>
