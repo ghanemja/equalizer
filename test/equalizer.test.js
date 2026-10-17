@@ -117,3 +117,40 @@ test('every example song renders', () => {
     assert.equal(out.left.length, Math.ceil(songDuration(song) * 8000), id);
   }
 });
+
+test('readMath turns everyday math into equations that compile', async () => {
+  const { readMath } = await import('../src/mathinput.js');
+  const cases = {
+    'y = e^{-3t} \\sin(2\\pi f t)': 'E^(-3*tau)*sin(2*PI*f*tau)',
+    'sin(2πft)·e^(−4x)': 'sin(2*PI*f*tau)*E^(-4*tau)',
+    'f(t) = |sin(2πft)|·exp(-5t)': 'abs(sin(2*PI*f*tau))*exp(-5*tau)',
+    'x²·e^(-x)': 'tau^(2)*E^(-tau)',
+    'sin 2πft': 'sin(2*PI*f*tau)',
+    '0.5sin(2πft)+0.5saw(ft)': '0.5*sin(2*PI*f*tau) + 0.5*saw(f*tau)',
+    '\\frac{\\sin(4\\pi f t)}{4}': '((sin(4*PI*f*tau))/(4))',
+  };
+  for (const [input, want] of Object.entries(cases)) {
+    const { equation } = readMath(input);
+    assert.equal(equation, want, input);
+    assert.doesNotThrow(() => compile(equation), input);
+  }
+  // Already-valid equations keep t (song time) when tau is also used, and knob names aren't split.
+  assert.equal(readMath('sin(TAU*f*tau)*sin(TAU*0.5*t)').equation, 'sin(TAU*f*tau)*sin(TAU*0.5*t)');
+  assert.equal(readMath('exp(-tau*ft)', ['ft']).equation, 'exp(-tau*ft)');
+  // It only rewrites text: anything unsafe is still rejected by compile().
+  assert.throws(() => compile(readMath('constructor.constructor("alert(1)")()').equation), EquationError);
+});
+
+test('math rhythms', async () => {
+  const { makeRhythm, toPattern, fromEquation } = await import('../src/rhythms.js');
+  const p = (kind, opts) => toPattern(makeRhythm(kind, opts));
+  assert.equal(p('euclid', { k: 3, n: 8 }), 'x..x..x.');
+  assert.equal(p('euclid', { k: 5, n: 8, rotate: 6 }), 'x.xx.xx.');
+  assert.equal(p('euclid', { k: 3, n: 8, rotate: 1 }), '.x..x..x');
+  assert.equal(p('polyrhythm', { a: 3, b: 4, n: 12 }), 'x..xx.x.xx..');
+  assert.equal(p('fibonacci', { n: 16 }), 'xxx.x..x....x...');
+  assert.equal(p('primes', { n: 16 }), '.xx.x.x...x.x...');
+  assert.equal(toPattern(fromEquation('i % 4 == 0', 8)), 'x...x...');
+  assert.equal(toPattern(makeRhythm('euclid', { k: 3, n: 8 }), ['C3', 'E3']), 'C3 . . E3 . . C3 .');
+  assert.throws(() => fromEquation('i.constructor', 8), EquationError);
+});

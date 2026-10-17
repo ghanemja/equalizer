@@ -83,6 +83,15 @@ Plus any parameters you define (`decay`, `punch`, …), which become knobs in th
 
 `sin cos tan tanh exp log pow sqrt abs min max floor fract mod clamp mix`, oscillators that take a phase in cycles (`osc`, `saw`, `sqr(p, duty)`, `tri`), `noise()`, an envelope `ad(tau, attack, decay)`, and constants `PI TAU E`. `a ^ b` is a power and `cond ? a : b` picks between two values.
 
+### Paste math the way you write it
+
+The studio reads everyday math too: `2πft`, `e^{-3t}`, `x²`, `|x|`, `√x`, LaTeX like `\sin` and `\frac{a}{b}`, and `y =` or `f(t) =` in front. It shows what it read (`y = e^{-3t} \sin(2\pi f t)` becomes `E^(-3*tau)*sin(2*PI*f*tau)`). A pasted formula's `x` or `t` is read as `tau`, the time since the note started. In code:
+
+```js
+import { readMath } from 'equalizer/math';
+readMath('sin(2πft)·e^(−4x)').equation;   // 'sin(2*PI*f*tau)*E^(-4*tau)'
+```
+
 ### Patterns
 
 - Drums: `x...x...` (`x` fires, `.` lets it ring, `-` stops it, `|` is ignored so you can write `x...|x...`).
@@ -90,6 +99,26 @@ Plus any parameters you define (`decay`, `punch`, …), which become knobs in th
 - `rate` is steps per beat (4 = sixteenth notes, 0.25 = one per bar).
 - `at: [1.5, 3.2]` fires at exact times in seconds, handy for sound effects.
 - `gate: 't > 8 && bar < 12'` is an equation that decides whether a step fires. Use it for arrangement: drop the drums out, bring them back.
+
+### Math rhythms
+
+Instead of clicking squares, pick a rhythm in a sound's panel (Rhythm & effects → Math rhythm), or use the generators directly:
+
+| Rhythm | What it does |
+| --- | --- |
+| Euclidean E(k, n) | k hits spread as evenly as possible over n steps. E(3,8) is the tresillo, E(5,16) a bossa feel, E(7,16) samba |
+| Polyrhythm a : b | a evenly spaced pulses against b |
+| Fibonacci steps | Hits on steps 1, 2, 3, 5, 8, 13 |
+| Prime steps | Hits on steps 2, 3, 5, 7, 11, 13 |
+| Golden ratio | Hits wherever multiples of 1/φ cross a whole number (the Fibonacci word) |
+| Your own rule | Hit wherever an equation is true, like `i % 3 == 0` (i is the step, n the number of steps) |
+
+Every one can be rotated, and melodic sounds keep their notes on the new hits.
+
+```js
+import { makeRhythm, toPattern } from 'equalizer/rhythms';
+toPattern(makeRhythm('euclid', { k: 3, n: 8 }));   // 'x..x..x.'
+```
 
 ### Track options
 
@@ -128,7 +157,7 @@ npm test       # node's built-in test runner, no dependencies
 npm start      # serve the studio at http://localhost:8080
 ```
 
-`src/equalizer.js` is the library, `src/presets.js` holds the built-in equations and songs, `index.html`, `studio.css` and `studio.js` are the studio, and `feed.js` is the live feed.
+`src/equalizer.js` is the library, `src/presets.js` holds the built-in equations and songs, `src/mathinput.js` reads everyday math, `src/rhythms.js` makes math rhythms, `index.html`, `studio.css` and `studio.js` are the studio, and `feed.js` is the live feed.
 
 ## Made with equalizer
 

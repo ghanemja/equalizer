@@ -6,7 +6,9 @@
   "main": "./src/equalizer.js",
   "exports": {
     ".": "./src/equalizer.js",
-    "./presets": "./src/presets.js"
+    "./presets": "./src/presets.js",
+    "./math": "./src/mathinput.js",
+    "./rhythms": "./src/rhythms.js"
   },
   "files": ["src"],
   "scripts": {

@@ -4,6 +4,8 @@ import {
 } from './src/equalizer.js?v=dev';
 import { INSTRUMENTS, SONGS, byId, track as makeTrack } from './src/presets.js?v=dev';
 import { initFeed } from './feed.js?v=dev';
+import { readMath } from './src/mathinput.js?v=dev';
+import { RHYTHMS, RHYTHM_PRESETS, makeRhythm, toPattern } from './src/rhythms.js?v=dev';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, props = {}, ...kids) => {
@@ -79,6 +81,24 @@ function rangeOf(t, k) {
 }
 
 /** The equation error for a track, or null if it can play. */
+/**
+ * Read an equation as written; if that doesn't compile, read it as everyday math (π, 2x, e^{...},
+ * LaTeX, "y = ..."). Returns { equation, readAs, notes, error }: readAs is set when the math
+ * reading was used, error when neither compiles (keeping the more useful message).
+ */
+function interpret(text, paramNames = []) {
+  const err = (eq) => { try { compile(eq, paramNames); return null; } catch (e) { if (e instanceof EquationError) return e.message; throw e; } };
+  const rawError = err(text);
+  if (!rawError) return { equation: text, readAs: null, notes: [], error: null };
+  const m = readMath(text, paramNames);
+  const mathError = m.equation ? err(m.equation) : rawError;
+  const unknown = (msg) => /^Unknown name "/.test(msg ?? '');
+  if (!mathError || (unknown(mathError) && !unknown(rawError))) {
+    return { equation: m.equation, readAs: m.equation !== text ? m.equation : null, notes: m.notes, error: mathError };
+  }
+  return { equation: text, readAs: null, notes: [], error: rawError };
+}
+
 function problem(t) {
   try {
     compile(t.equation, Object.keys(t.params));
@@ -718,8 +738,14 @@ function buildInspector() {
       } }));
     }
   };
+  const readAsLine = h('div', { class: 'read-as' });
+  const paintReadAs = (r) => {
+    readAsLine.replaceChildren(...(r.readAs ? ['Read as ', h('code', { text: r.readAs }), r.notes.length ? ` · ${r.notes.join(' · ')}` : ''] : []));
+  };
   eq.addEventListener('input', () => {
-    t.equation = eq.value;
+    const r = interpret(eq.value, Object.keys(t.params));
+    t.equation = r.equation;
+    paintReadAs(r);
     const pe = plots[selected]?.el.querySelector('.plot-eq');
     if (pe) pe.replaceChildren(h('i', { text: 'f(τ)' }), ' = ', prettyEq(t.equation, t.params));
     validate(); refresh(); changed();
@@ -736,9 +762,9 @@ function buildInspector() {
   const mathCard = h('section', { class: 'insp-card', 'data-kind': kind },
     h('h2', {}, h('span', { class: 'n', text: '2' }), 'The math'),
     h('p', { class: 'sub', text: 'This equation is the sound wave. Edit it and hear the change.' }),
-    eq, err,
+    eq, err, readAsLine,
     h('div', { class: 'field' }, h('span', { text: 'Insert' }), chips),
-    h('p', { class: 'small', text: 'tau is the time since the note started, f is its pitch. Unknown names can become knobs.' }));
+    h('p', { class: 'small', text: 'tau is the time since the note started, f is its pitch. Paste math as you would write it (2πft, e^{-3t}, x², LaTeX) and it is read for you. Unknown names can become knobs.' }));
   validate();
 
   // 3. Rhythm & effects
@@ -782,6 +808,62 @@ function buildInspector() {
     }
   }
 
+  // Math rhythms: Euclidean, polyrhythms, Fibonacci, primes, the golden ratio or your own rule.
+  // The settings live on the track as _rhythm (in memory only; the pattern is what's saved).
+  const rhythmPick = h('select', { 'aria-label': 'Math rhythm' });
+  rhythmPick.add(new Option('Hand-made (click the squares)', ''));
+  for (const [id, g] of Object.entries(RHYTHMS)) rhythmPick.add(new Option(g.label, id));
+  rhythmPick.value = t._rhythm?.kind ?? '';
+  const rhythmInputs = h('div', { class: 'rhythm-inputs' });
+  const rhythmErr = h('div', { class: 'err' });
+  const applyRhythm = ({ undo = false } = {}) => {
+    const r = t._rhythm;
+    if (!r) return;
+    let hits;
+    try { hits = makeRhythm(r.kind, r.opts); rhythmErr.textContent = ''; }
+    catch (e) { rhythmErr.textContent = e.message; return; }
+    const before = t.pattern;
+    // Melodic sounds keep their notes, in order, on the new hits.
+    const own = tokensOf(t).toks.filter(isNote);
+    const pitched = isMelodic(t) || (!(t.pattern ?? '').trim() && ['bass', 'keys', 'pads'].includes(kindOf(t)));
+    const notes = pitched ? (own.length ? own : [kindOf(t) === 'bass' ? 'C2' : 'C4']) : null;
+    t.pattern = toPattern(hits, notes);
+    patternInput.value = t.pattern;
+    picked = null;
+    drawCells(rows[selected]);
+    changed({ now: true });
+    if (undo) toast(`${RHYTHMS[r.kind].label} applied`, { label: 'Undo', run: () => { t.pattern = before; t._rhythm = null; drawCells(rows[selected]); buildInspector(); changed({ now: true }); } });
+  };
+  const paintRhythmInputs = () => {
+    rhythmInputs.replaceChildren();
+    const r = t._rhythm;
+    if (!r) return;
+    const num = (key, label, min, max) => {
+      const input = h('input', { type: 'number', min, max, step: 1, value: r.opts[key], 'aria-label': label });
+      input.addEventListener('input', () => { if (input.value === '') return; r.opts[key] = +input.value; applyRhythm(); });
+      rhythmInputs.append(h('label', { class: 'num' }, h('span', { text: label }), input));
+    };
+    for (const [key, [label, , min, max]] of Object.entries(RHYTHMS[r.kind].inputs)) num(key, label, min, max);
+    num('rotate', 'rotate', -64, 64);
+    if (r.kind === 'equation') {
+      const rule = h('input', { class: 'pattern', spellcheck: 'false', value: r.opts.equation ?? 'i % 3 == 0', 'aria-label': 'Rhythm rule' });
+      rule.addEventListener('input', () => { r.opts.equation = rule.value; applyRhythm(); });
+      rhythmInputs.append(h('label', { class: 'field rule' }, h('span', { text: 'Hit when (i = step, n = steps)' }), rule));
+    }
+  };
+  const setRhythm = (kind, opts) => {
+    if (!kind) { t._rhythm = null; paintRhythmInputs(); return; }
+    const defaults = Object.fromEntries(Object.entries(RHYTHMS[kind].inputs).map(([k, [, v]]) => [k, v]));
+    t._rhythm = { kind, opts: { ...defaults, rotate: 0, ...opts } };
+    rhythmPick.value = kind;
+    paintRhythmInputs();
+    applyRhythm({ undo: true });
+  };
+  rhythmPick.addEventListener('change', () => setRhythm(rhythmPick.value));
+  const rhythmPresets = h('div', { class: 'vars-inline rhythm-presets' },
+    ...RHYTHM_PRESETS.map(([label, kind, opts]) => h('button', { text: label, title: `${RHYTHMS[kind].label}`, onclick: () => setRhythm(kind, opts) })));
+  paintRhythmInputs();
+
   const fx = h('div', { class: 'knobs' });
   const fxKnob = (label, key, min, max, scale, off, format, title) => fx.append(knob({
     label, min, max, value: t[key] ?? off, reset: byId[t.instrument]?.[key] ?? off, scale, format, title,
@@ -796,6 +878,7 @@ function buildInspector() {
   const rhythmCard = h('section', { class: 'insp-card', 'data-kind': kind },
     h('h2', {}, h('span', { class: 'n', text: '3' }), 'Rhythm & effects'),
     h('label', { class: 'field' }, h('span', { text: 'Each square is a' }), rate),
+    h('div', { class: 'field' }, h('span', { text: 'Math rhythm' }), rhythmPick, rhythmPresets, rhythmInputs, rhythmErr),
     noteEditor,
     fx,
     h('details', { class: 'adv' }, h('summary', { text: 'Edit the pattern as text' }), patternInput,
@@ -962,33 +1045,33 @@ const LAB_EXAMPLES = [
   ['Siren', 'sin(TAU*f*tau + 150*sin(TAU*1.5*tau))'],
   ['Laser', 'sqr(1800*tau - 5000*tau^2) * exp(-tau*6)'],
   ['Noise hat', 'noise() * exp(-tau*40)'],
+  ['Textbook math', 'y = e^{-3t} \\sin(2\\pi f t)'],
 ];
 const lab = { eq: $('#lab-eq'), note: $('#lab-note'), len: $('#lab-len'), status: $('#lab-status'), canvas: $('#lab-plot'), cache: null, play: null, ctx: null, src: null };
 
-/** Compile the lab equation; unknown names become parameters set to 1. */
+/** Compile the lab equation (read as everyday math if needed); unknown names become parameters set to 1. */
 function labParse() {
-  const equation = lab.eq.value.trim();
+  let text = lab.eq.value.trim();
   const params = {};
-  for (let k = 0; k < 8; k++) {
-    try {
-      compile(equation, Object.keys(params));
-      return { equation, params, error: null };
-    } catch (e) {
-      if (!(e instanceof EquationError)) throw e;
-      const m = /^Unknown name "(\w+)"$/.exec(e.message);
-      if (m && isParamName(m[1])) { params[m[1]] = 1; continue; }
-      return { equation, params, error: e.message };
-    }
+  let readAs = null, notes = [];
+  for (let k = 0; k < 9; k++) {
+    const r = interpret(text, Object.keys(params));
+    if (r.readAs) { text = r.equation; readAs = r.readAs; notes = r.notes; }
+    if (!r.error) return { equation: text, params, readAs, notes, error: null };
+    const m = /^Unknown name "(\w+)"$/.exec(r.error);
+    if (m && isParamName(m[1]) && k < 8) { params[m[1]] = 1; continue; }
+    return { equation: text, params, readAs, notes, error: r.error };
   }
-  return { equation, params, error: 'Too many unknown names' };
+  return { equation: text, params, readAs, notes, error: 'Too many unknown names' };
 }
 
 function labUpdate() {
-  const { params, error } = labParse();
+  const { params, error, readAs, notes } = labParse();
   const f = noteToFreq(lab.note.value);
   lab.status.classList.toggle('bad', !!error);
   const extra = Object.keys(params).length ? ` · ${Object.keys(params).join(', ')} = 1 (add it to the beat to get a knob)` : '';
   lab.status.textContent = error ?? `✓ Plotted over ${lab.len.value} s at ${lab.note.value} (${Math.round(f)} Hz)${extra}`;
+  if (readAs && !error) lab.status.append(h('span', { class: 'read-as' }, 'Read as ', h('code', { text: readAs }), notes.length ? ` · ${notes.join(' · ')}` : ''));
   $('#lab-play').disabled = !!error;
   $('#lab-add').disabled = !!error;
   lab.cache = null;
@@ -1158,7 +1241,7 @@ function slim(s) {
   return { ...s, tracks: s.tracks.map((t) => {
     const out = {};
     for (const [k, v] of Object.entries(t)) {
-      if (v === undefined || TRACK_DEFAULTS[k] === v) continue;
+      if (v === undefined || k.startsWith('_') || TRACK_DEFAULTS[k] === v) continue;
       if (k === 'equation' && v === byId[t.instrument]?.equation) continue;
       if (k === 'ranges' && !Object.keys(v).length) continue;
       out[k] = v;
