@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Stamp asset URLs with the commit so browsers fetch fresh files
-        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::7}/g" index.html studio.js
+        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::7}/g" index.html studio.js feed.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

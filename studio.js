@@ -3,6 +3,7 @@ import {
   triggers, songDuration,
 } from './src/equalizer.js?v=dev';
 import { INSTRUMENTS, SONGS, byId, track as makeTrack } from './src/presets.js?v=dev';
+import { initFeed } from './feed.js?v=dev';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, props = {}, ...kids) => {
@@ -1129,7 +1130,7 @@ const songPick = $('#song');
 for (const [id, s] of Object.entries(SONGS)) songPick.add(new Option(s.title, id));
 songPick.add(new Option('Blank (one kick)', 'blank'));
 songPick.addEventListener('change', () => {
-  if (songPick.value === 'shared') return;
+  if (songPick.value === 'shared' || songPick.value === 'feed') return;
   load(songPick.value === 'blank' ? { title: 'Blank', bpm: 120, bars: 4, tracks: [makeTrack('kick')] } : structuredClone(SONGS[songPick.value]));
   changed({ now: true });
 });
@@ -1248,6 +1249,21 @@ load(initial ?? structuredClone(SONGS.trap));
 if (!initial) songPick.value = 'trap';
 fitCanvas();
 requestAnimationFrame(frame);
+
+initFeed({
+  h, toast, slim,
+  getSong: () => song,
+  loadBeat(shared, beat) {
+    load({ ...unslim(structuredClone(shared)), title: beat.title });
+    let opt = [...songPick.options].find((o) => o.value === 'feed');
+    if (!opt) songPick.add(opt = new Option('', 'feed'));
+    opt.text = `Feed: ${beat.title}`;
+    songPick.value = 'feed';
+    changed({ now: true });
+    if (!player.playing) play();
+    toast(`Playing "${beat.title}" by ${beat.author}`);
+  },
+});
 
 // --- Sound on by default ---------------------------------------------------------------
 // Browsers only allow audio after the visitor interacts with the page, so: start right away

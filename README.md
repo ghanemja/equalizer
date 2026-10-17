@@ -24,6 +24,12 @@ No samples, no dependencies, no build step. Every sound is computed from math, 4
 
 All three were rendered straight from their equations with `examples/render.mjs`, then encoded to MP3.
 
+## Live feed
+
+Hit **Post your beat** in the studio and it shows up for everyone in the live feed, where anyone can play it, like it and remix it. The feed runs on a free [Supabase](https://supabase.com) database: `feed.js` talks to it directly (REST plus a websocket for live updates, falling back to checking every 30 seconds), and `supabase/schema.sql` sets it up. Visitors can only read, post, like and report; nobody can edit or delete from a browser, each visitor can post 5 beats per 10 minutes, and 3 reports hide a beat. If the feed is down, the rest of the studio keeps working.
+
+To run your own copy, create a Supabase project, run `supabase/schema.sql` in its SQL Editor, and put your project URL and publishable key at the top of `feed.js`.
+
 ## How it works
 
 A song is a tempo plus a list of tracks. Each track is an equation, a step pattern that says when it fires, and its parameters:
@@ -122,7 +128,7 @@ npm test       # node's built-in test runner, no dependencies
 npm start      # serve the studio at http://localhost:8080
 ```
 
-`src/equalizer.js` is the library, `src/presets.js` holds the built-in equations and songs, and `index.html`, `studio.css` and `studio.js` are the studio.
+`src/equalizer.js` is the library, `src/presets.js` holds the built-in equations and songs, `index.html`, `studio.css` and `studio.js` are the studio, and `feed.js` is the live feed.
 
 ## Made with equalizer
 

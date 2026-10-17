@@ -82,6 +82,21 @@
       <div class="grid" id="grid"></div>
     </section>
 
+    <section class="feed" id="feed" aria-label="Live feed">
+      <div class="feed-head">
+        <div>
+          <h2><span class="live-dot" aria-hidden="true"></span>Live feed</h2>
+          <p>Beats people just made. Tap one to load it, play it and remix it.</p>
+        </div>
+        <button class="btn accent" id="post-btn">Post your beat</button>
+      </div>
+      <ol class="feed-list" id="feed-list"></ol>
+      <div class="feed-foot">
+        <button class="mini-btn" id="feed-more" hidden>Load more</button>
+        <p class="feed-status" id="feed-status" role="status"></p>
+      </div>
+    </section>
+
     <section class="inspector" id="inspector" aria-label="Selected sound"></section>
 
     <section class="cheats" id="cheats">
@@ -119,6 +134,20 @@
       <div class="plots" id="plots"></div>
     </aside>
   </main>
+
+  <dialog class="post-dialog" id="post-dialog" aria-labelledby="post-heading">
+    <form method="dialog" id="post-form">
+      <h2 id="post-heading">Post to the live feed</h2>
+      <label class="field"><span>Title</span><input id="post-title" maxlength="60" required autocomplete="off" placeholder="My first math beat"></label>
+      <label class="field"><span>Your name</span><input id="post-author" maxlength="30" required autocomplete="nickname" placeholder="DJ Sine"></label>
+      <p class="small">Everyone can hear and remix what you post. Up to 5 posts every 10 minutes.</p>
+      <p class="post-error" id="post-error" role="alert"></p>
+      <div class="btn-row">
+        <button class="mini-btn" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn accent" value="post" id="post-submit">Post</button>
+      </div>
+    </form>
+  </dialog>
 
   <footer>
     <a href="https://github.com/ghanemja/equalizer">GitHub</a> · MIT · Every sound here is synthesized from math: no samples.
