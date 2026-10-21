@@ -128,6 +128,16 @@ test('readMath turns everyday math into equations that compile', async () => {
     'sin 2πft': 'sin(2*PI*f*tau)',
     '0.5sin(2πft)+0.5saw(ft)': '0.5*sin(2*PI*f*tau) + 0.5*saw(f*tau)',
     '\\frac{\\sin(4\\pi f t)}{4}': '((sin(4*PI*f*tau))/(4))',
+    // Wolfram Alpha, ChatGPT, Desmos, Google, code and spreadsheets
+    'Sin[2 Pi 440 t] Exp[-3 t]': 'sin(2*PI*440*tau)*exp(-3*tau)',
+    'Mod[t, 1] - Floor[t]': 'mod(tau, 1) - floor(tau)',
+    '\\( y(t) = e^{-3t}\\sin(2\\pi f t) \\)': 'E^(-3*tau)*sin(2*PI*f*tau)',
+    'y=\\sin\\left(2\\pi\\cdot440x\\right)e^{-3x}': 'sin(2*PI*440*tau)*E^(-3*tau)',
+    'graph y=sin(x)*e^(-x)': 'sin(tau)*E^(-tau)',
+    'np.sin(2*np.pi*f*t) * np.exp(-3*t)': 'sin(2*PI*f*tau)*exp(-3*tau)',
+    '=SIN(2*PI()*440*t)': 'sin(2*PI*440*tau)',
+    'sin(2πft) ≈ 0.5': 'sin(2*PI*f*tau)',
+    'sin(ωt)': 'sin((2*PI*f)*tau)',
   };
   for (const [input, want] of Object.entries(cases)) {
     const { equation } = readMath(input);
