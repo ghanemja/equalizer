@@ -35,7 +35,7 @@ code { font-family: var(--mono); font-size: .88em; color: var(--cyan); backgroun
 [data-kind=pads] { --c: var(--violet); }
 [data-kind=fx] { --c: var(--lime); }
 
-.console, .screen, .seq-panel, .feed, .insp-card, .cheats details, .tips {
+.console, .screen, .seq-panel, .feed, .insp-card, .cheats details {
   background:
     repeating-linear-gradient(90deg, rgb(255 255 255 / .012) 0 1px, transparent 1px 3px),
     linear-gradient(180deg, var(--panel-2), var(--panel));
@@ -130,7 +130,7 @@ main { padding: 0 12px; }
 
 /* --- Math monitor (right column) --- */
 .monitor {
-  grid-area: mon; position: sticky; top: 96px; max-height: calc(100vh - 108px); overflow-y: auto; display: grid; gap: 10px; align-content: start;
+  grid-area: mon; position: sticky; top: calc(var(--console-h, 84px) + 24px); max-height: calc(100vh - var(--console-h, 84px) - 36px); overflow-y: auto; display: grid; gap: 10px; align-content: start;
   padding: 14px; border-radius: 16px; border: 1px solid var(--line);
   background: repeating-linear-gradient(90deg, rgb(255 255 255 / .012) 0 1px, transparent 1px 3px), linear-gradient(180deg, var(--panel-2), var(--panel));
   box-shadow: 0 1px 0 rgb(255 255 255 / .05) inset, 0 20px 40px -24px #000;
@@ -155,6 +155,35 @@ main { padding: 0 12px; }
 .plot-eq .p { color: var(--magenta); }
 .plot-eq .n, .plot-eq .sup { color: var(--amber); font-style: normal; }
 .plot.muted { opacity: .4; }
+
+/* --- Tour: dim the page, light up one control, explain it --- */
+.tour { position: fixed; inset: 0; z-index: 95; animation: tour-in .25s ease; }
+.tour--out { opacity: 0; transition: opacity .25s ease; }
+@keyframes tour-in { from { opacity: 0; } }
+.tour__hole {
+  position: fixed; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--lime), 0 0 24px 4px rgb(182 255 60 / .45), 0 0 0 200vmax rgb(4 4 8 / .74);
+  transition: left .35s ease, top .35s ease, width .35s ease, height .35s ease;
+}
+.tour__card {
+  position: fixed; width: min(340px, calc(100vw - 24px)); padding: 16px 16px 14px; border-radius: 16px;
+  border: 1px solid rgb(182 255 60 / .5); background: linear-gradient(180deg, #1d1d2a, #13131b); box-shadow: 0 24px 60px -16px #000;
+  transition: left .35s ease, top .35s ease;
+}
+.tour__count { font: 600 10px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--lime); }
+.tour__title { margin: 8px 0 4px; font-size: 18px; }
+.tour__text { margin: 0; color: #c7c7d6; font-size: 14.5px; line-height: 1.5; }
+.tour__dots { display: flex; gap: 5px; margin: 12px 0 10px; }
+.tour__dots i { width: 6px; height: 6px; border-radius: 50%; background: #34344a; }
+.tour__dots i.on { background: var(--lime); box-shadow: 0 0 8px var(--lime); }
+.tour__buttons { display: flex; align-items: center; gap: 8px; }
+.tour__buttons span { flex: 1; }
+.tour__skip { padding: 8px 4px; border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.tour__back, .tour__next { padding: 9px 16px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700; font-size: 14px; }
+.tour__back { border: 1px solid var(--line); background: #1c1c27; color: var(--text); }
+.tour__next { border: 1px solid var(--lime); background: linear-gradient(180deg, #d4ff7a, #8fd400); color: #0b1500; }
+.tour__next:focus-visible, .tour__back:focus-visible, .tour__skip:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .tour, .tour__hole, .tour__card { animation: none; transition: none; } }
 
 /* --- Live feed --- */
 .feed { border-radius: 16px; padding: 14px 16px; display: grid; gap: 12px; min-width: 0; }
@@ -198,17 +227,6 @@ main { padding: 0 12px; }
 .post-error:empty { display: none; }
 @media (prefers-reduced-motion: reduce) { .live-dot, .feed-item.fresh { animation: none; } }
 
-/* --- Tips --- */
-.tips { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-radius: 14px; border-color: rgb(0 229 255 / .35); }
-.tips[hidden] { display: none; }
-.tips ol { flex: 1; display: flex; flex-wrap: wrap; gap: 6px 26px; margin: 0; padding: 0; list-style: none; counter-reset: tip; }
-.tips li { counter-increment: tip; color: #c7c7d6; font-size: 14px; }
-.tips li::before {
-  content: counter(tip); display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 8px; border-radius: 50%;
-  background: var(--cyan); color: #001b20; font: 700 11px/1 var(--mono);
-}
-.tips li b { color: var(--text); }
-.tips-close { border: 1px solid var(--line); background: #1c1c27; border-radius: 10px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 13px; }
 
 /* --- Screen --- */
 .screen { position: relative; height: 150px; border-radius: 16px; overflow: hidden; background: #040406; }
@@ -296,7 +314,7 @@ main { padding: 0 12px; }
 /* The selected sound's panel: a sticky column on the left, scrolling on its own. */
 .inspector {
   grid-area: insp; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start;
-  position: sticky; top: 96px; max-height: calc(100vh - 108px); overflow-y: auto; overscroll-behavior: contain;
+  position: sticky; top: calc(var(--console-h, 84px) + 24px); max-height: calc(100vh - var(--console-h, 84px) - 36px); overflow-y: auto; overscroll-behavior: contain;
   scrollbar-width: thin; scrollbar-color: #33334a transparent; border-radius: 16px;
 }
 .insp-card { border-radius: 16px; padding: 14px 16px 16px; display: grid; gap: 12px; align-content: start; border-top: 3px solid var(--c); min-width: 0; }
@@ -425,11 +443,13 @@ footer a { color: var(--cyan); }
 .splash__note { margin: 0; color: #b4b4c8; font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { .splash__go { animation: none; } .splash { transition: none; } }
 .toast {
-  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50;
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 100;
   padding: 10px 16px; border-radius: 10px; background: #0d0d14; border: 1px solid var(--cyan); color: var(--text);
   box-shadow: 0 0 20px rgb(0 229 255 / .3); font-size: 14px;
 }
 
+/* Keep the top bar on one row on laptops: the running time is the one readout it can spare. */
+@media (max-width: 1599px) { .lcd.time { display: none; } }
 /* Narrower screens: the math monitor moves under the beat, then the sound panel goes below too. */
 @media (max-width: 1699px) {
   .layout { grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: "insp main" "insp mon"; }
@@ -453,7 +473,6 @@ footer a { color: var(--cyan); }
   .feed-head .btn { width: 100%; }
   .feed-list { grid-template-columns: 1fr; max-height: 360px; }
   .monitor { order: 4; padding: 10px; }
-  .tips { order: 5; }
   .inspector { order: 6; grid-template-columns: 1fr; }
   .lab { order: 7; }
   .cheats { order: 8; }
@@ -500,5 +519,4 @@ footer a { color: var(--cyan); }
   .plot canvas { height: 84px; }
   .formula { font-size: 12px; }
   .lab-row .btn { flex: 1; }
-  .tips { flex-direction: column; align-items: stretch; }
 }

@@ -4,6 +4,7 @@ import {
 } from './src/equalizer.js?v=dev';
 import { INSTRUMENTS, SONGS, byId, track as makeTrack } from './src/presets.js?v=dev';
 import { initFeed } from './feed.js?v=dev';
+import { startTour, tourSeen } from './tour.js?v=dev';
 import { readMath } from './src/mathinput.js?v=dev';
 import { RHYTHMS, RHYTHM_PRESETS, makeRhythm, toPattern } from './src/rhythms.js?v=dev';
 
@@ -132,7 +133,7 @@ function changed({ now = false } = {}) {
   triggerCache = null;
   clearTimeout(renderTimer);
   const go = () => {
-    try { localStorage.setItem('eq-song-v2', JSON.stringify(song)); } catch {}
+    try { localStorage.setItem('eq-song-v3', JSON.stringify(song)); } catch {}
     if (player.playing) player.update(playable());
   };
   if (now) go(); else renderTimer = setTimeout(go, 140);
@@ -1352,15 +1353,20 @@ $('#share').addEventListener('click', async () => {
   catch { window.prompt('Copy this link to share your beat:', url); }
 });
 
-// tips
-const tips = $('#tips');
-try { if (localStorage.getItem('eq-tips') === 'hidden') tips.hidden = true; } catch {}
-$('#tips-close').addEventListener('click', () => { tips.hidden = true; try { localStorage.setItem('eq-tips', 'hidden'); } catch {} });
-$('#help-btn').addEventListener('click', () => {
-  tips.hidden = !tips.hidden;
-  if (!tips.hidden) tips.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  $('#cheats details').open = true;
-});
+// "?" replays the tour; first-time visitors get it once the beat has started.
+$('#help-btn').addEventListener('click', () => startTour());
+const firstTour = () => { if (!tourSeen()) setTimeout(startTour, 600); };
+// If the browser still hasn't let audio start shortly after the tap, offer a button that can.
+// Older iPhones also mute web audio with the silent switch, so say so there.
+function soundCheck() {
+  setTimeout(() => {
+    if (player.ctx?.state === 'running') {
+      if (/iPhone|iPad/.test(navigator.userAgent) && !navigator.audioSession) toast('No sound? Turn off silent mode on your iPhone.');
+      return;
+    }
+    toast("Sound didn't start", { label: 'Sound on', run: () => { unlockAudio(); player.ctx?.resume(); if (!player.playing) play(); } });
+  }, 1500);
+}
 
 function load(s) {
   song = sanitize(s);
@@ -1399,11 +1405,14 @@ window.addEventListener('hashchange', async () => {
     changed({ now: true });
   } catch { toast("That share link couldn't be read"); }
 });
-if (!initial) { try { initial = JSON.parse(localStorage.getItem('eq-song-v2')); } catch {} }
-load(initial ?? structuredClone(SONGS.trap));
-if (!initial) songPick.value = 'trap';
+if (!initial) { try { initial = JSON.parse(localStorage.getItem('eq-song-v3')); } catch {} }
+load(initial ?? structuredClone(SONGS.smooth));
+if (!initial) songPick.value = 'smooth';
 fitCanvas();
 requestAnimationFrame(frame);
+
+// The sticky side panels sit just under the top bar, however many rows it wraps to.
+new ResizeObserver(([e]) => document.documentElement.style.setProperty('--console-h', `${Math.round(e.target.getBoundingClientRect().height)}px`)).observe($('.console'));
 
 initFeed({
   h, toast, slim,
@@ -1431,7 +1440,7 @@ const KIND_COLORS = { drums: '#ff3cac', bass: '#ffb020', keys: '#00e5ff', pads: 
     const probe = new AudioContext();
     const allowed = probe.state === 'running';
     probe.close();
-    if (allowed) { play(); return; }
+    if (allowed) { play(); firstTour(); return; }
   } catch {}
 
   const lead = song.tracks.find((t) => !problem(t) && kindOf(t) !== 'fx') ?? song.tracks[0];
@@ -1491,6 +1500,8 @@ const KIND_COLORS = { drums: '#ff3cac', bass: '#ffb020', keys: '#00e5ff', pads: 
     document.documentElement.classList.remove('splash-open');
     document.removeEventListener('keydown', onKey, true);
     setTimeout(() => { cancelAnimationFrame(raf); splash.remove(); }, 450);
+    firstTour();
+    soundCheck();
   };
   const onKey = (e) => { if (!e.metaKey && !e.ctrlKey && !e.altKey) start(e); };
   splash.addEventListener('click', start);

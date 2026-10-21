@@ -18,7 +18,7 @@ No samples, no dependencies, no build step. Every sound is computed from math, 4
 
 ## Listen
 
-- [Hyperbolic 808](docs/audio/hyperbolic-808.mp3): the studio's default beat (trap, 140 bpm)
+- [Hyperbolic 808](docs/audio/hyperbolic-808.mp3): trap, 140 bpm
 - [Floor Function](docs/audio/four-on-the-floor.mp3): four on the floor (house, 124 bpm, 16 bars)
 - [art-medium theme](docs/audio/art-medium-theme.mp3): the soundtrack of the art-medium promo video
 
@@ -142,14 +142,15 @@ Each one is named after the math behind its signature sound.
 
 | Song | Style | The math |
 | --- | --- | --- |
-| Hyperbolic 808 (default) | Trap, 140 bpm | The 808 kick is `tanh(drive * sin(...))`, a sine pushed through the hyperbolic tangent |
+| Smooth Function (default) | Chill rap, 140 bpm half-time | A smooth function has no sharp corners, and neither does this beat: Am9, Fmaj7, Dm9, E7 on an electric piano over an 808 sub |
+| Hyperbolic 808 | Trap, 140 bpm | The 808 kick is `tanh(drive * sin(...))`, a sine pushed through the hyperbolic tangent |
 | Floor Function | House, 124 bpm | Four on the floor. It's also the theme of the art-medium promo video |
 | Fourier Drive | Synthwave, 100 bpm | Sawtooth bass and pads; every saw is a Fourier series of sines |
 | Sine of the Times | Dubstep, 140 bpm | The wobble is a saw multiplied by a slow sine |
 | Trig Homework | Lo-fi, 84 bpm | A triangle wave with a slow sine wobble on its pitch |
 | Square One | Chiptune, 140 bpm | Square waves, `sqr(f*tau, duty)` |
 
-Pick one from the Song menu, or render it with `node examples/render.mjs <id>` (`trap`, `house`, `synthwave`, `dubstep`, `lofi`, `chip`).
+Pick one from the Song menu, or render it with `node examples/render.mjs <id>` (`smooth`, `trap`, `house`, `synthwave`, `dubstep`, `lofi`, `chip`).
 
 ## Develop
 

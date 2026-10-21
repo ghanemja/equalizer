@@ -80,6 +80,14 @@ export const INSTRUMENTS = [
     pattern: 'C2 . . . . . . . . . . . . . . . Eb2 . . . . . . . . . . . G1 . . .', lp: 800, gain: 0.55,
   },
 
+  {
+    id: 'sub808', name: 'Bass · 808 sub', kind: 'bass',
+    // tanh saturation adds harmonics, so the sub is heard on phone speakers too
+    equation: '(tanh(sat*sin(TAU*f*tau)) + 0.45*tanh(sat*sin(TAU*2*f*tau))) * ad(tau, 0.006, decay)',
+    params: { sat: P(8, 1, 16), decay: P(0.9, 0.2, 4) },
+    pattern: 'A1 . . . . . . . . . A1 . . . . . F1 . . . . . . . . . F1 . . . . .', len: 1.4, lp: 2400, gain: 0.4,
+  },
+
   // --- Keys and leads ---
   {
     id: 'pluck', name: 'Keys · harmonic pluck', kind: 'keys',
@@ -110,6 +118,13 @@ export const INSTRUMENTS = [
     equation: 'tri(f*tau + wobble*sin(TAU*0.7*t)) * exp(-tau*decay)',
     params: { wobble: P(0.01, 0, 0.08), decay: P(1.2, 0.3, 5) },
     pattern: 'A3+C4+E4 . . . . . . . F3+A3+C4 . . . . . . .', rate: 2, lp: 2200, gain: 0.5,
+  },
+
+  {
+    id: 'rhodes', name: 'Keys · electric piano', kind: 'keys',
+    equation: '(sin(TAU*f*tau) + bright*(0.32*sin(TAU*2*f*tau)*exp(-tau*2.5) + 0.1*sin(TAU*3*f*tau)*exp(-tau*5))) * ad(tau, 0.012, decay) * (1 + trem*sin(TAU*4.5*t))',
+    params: { bright: P(1, 0, 1), decay: P(0.9, 0.2, 4), trem: P(0.14, 0, 0.5) },
+    pattern: 'A3+C4+E4+G4+B4 . . A3+C4+E4+G4+B4 . . . . F3+A3+C4+E4 . . F3+A3+C4+E4 . . . .', rate: 2, lp: 2600, echo: 0.18, gain: 0.5,
   },
 
   // --- Pads ---
@@ -158,6 +173,12 @@ export const INSTRUMENTS = [
     pattern: '', hp: 1500, len: 0.03, gain: 0.35,
   },
   {
+    id: 'crackle', name: 'FX · vinyl crackle', kind: 'fx',
+    equation: 'noise() * exp(-tau*decay) * (0.3 + 0.7*r)',
+    params: { decay: P(700, 200, 2000) },
+    pattern: 'x...x.x..x...x..x..x...x.x....x.', hp: 1800, lp: 7000, len: 0.02, gain: 0.14,
+  },
+  {
     id: 'laser', name: 'FX · laser zap', kind: 'fx',
     equation: 'sqr(hi*tau - (hi - lo)*tau^2*speed/2, 0.5) * exp(-tau*decay)',
     params: { hi: P(1800, 300, 4000), lo: P(200, 50, 1000), speed: P(6, 1, 20), decay: P(10, 2, 40) },
@@ -202,6 +223,20 @@ export function bassline(list, rhythm, octave = -2) {
 }
 
 export const SONGS = {
+  // A smooth (infinitely differentiable) function, and a smooth half-time rap beat: Am9, Fmaj7, Dm9, E7.
+  smooth: {
+    title: 'Smooth Function', bpm: 140, bars: 4,
+    tracks: [
+      track('kick808', { pattern: 'x.........x.....x.........x..x..', params: { base: 46, punch: 70, sweep: 16, decay: 3.2, drive: 2 }, gain: 0.95 }),
+      track('snare', { pattern: '........x.......', params: { tone: 0.42, body: 175, decay: 8 }, hp: 160, lp: 7000, gain: 1.5 }),
+      track('clap', { pattern: '........x.......', params: { decay: 14, gap: 0.012 }, hp: 1000, gain: 0.38, pan: -0.1 }),
+      track('hat', { pattern: 'x.x.x.x.x.x.x.xxx.x.x.x.x.xxx.x.', params: { metal: 0.2, decay: 70 }, hp: 7000, gain: 0.35, pan: 0.2 }),
+      track('sub808', { name: '808', pattern: ['A1', 'F1', 'D2', 'E1'].map((r) => `${r} . . . . . . . . . ${r} . . . . .`).join(' '), gain: 0.36 }),
+      track('rhodes', { pattern: ['A3+C4+E4+G4+B4', 'F3+A3+C4+E4', 'D3+F3+A3+C4+E4', 'E3+G#3+B3+D4'].map((c) => `${c} . . ${c} . . . .`).join(' '), pan: -0.08 }),
+      track('choir', { pattern: 'A4+C5+E5 F4+A4+C5 D4+F4+A4 E4+G#4+B4', lp: 1400, gain: 0.1 }),
+      track('crackle'),
+    ],
+  },
   // tanh(drive * sin(...)): the 808 kick is a sine pushed through the hyperbolic tangent.
   trap: {
     title: 'Hyperbolic 808', bpm: 140, bars: 4,
