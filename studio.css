@@ -92,8 +92,11 @@ code { font-family: var(--mono); font-size: .88em; color: var(--cyan); backgroun
 .vol input { width: 90px; accent-color: var(--cyan); }
 
 main { padding: 0 12px; }
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
-.col-main { display: grid; gap: 12px; min-width: 0; }
+.layout {
+  display: grid; gap: 12px; align-items: start;
+  grid-template-columns: 330px minmax(0, 1fr) 320px; grid-template-areas: "insp main mon";
+}
+.col-main { grid-area: main; display: grid; gap: 12px; min-width: 0; }
 
 /* --- Equation lab --- */
 .lab {
@@ -127,7 +130,7 @@ main { padding: 0 12px; }
 
 /* --- Math monitor (right column) --- */
 .monitor {
-  position: sticky; top: 96px; max-height: calc(100vh - 108px); overflow-y: auto; display: grid; gap: 10px; align-content: start;
+  grid-area: mon; position: sticky; top: 96px; max-height: calc(100vh - 108px); overflow-y: auto; display: grid; gap: 10px; align-content: start;
   padding: 14px; border-radius: 16px; border: 1px solid var(--line);
   background: repeating-linear-gradient(90deg, rgb(255 255 255 / .012) 0 1px, transparent 1px 3px), linear-gradient(180deg, var(--panel-2), var(--panel));
   box-shadow: 0 1px 0 rgb(255 255 255 / .05) inset, 0 20px 40px -24px #000;
@@ -290,7 +293,12 @@ main { padding: 0 12px; }
 .add-row .hint { color: var(--muted); font-size: 13px; padding-left: 4px; }
 
 /* --- Inspector --- */
-.inspector { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 12px; }
+/* The selected sound's panel: a sticky column on the left, scrolling on its own. */
+.inspector {
+  grid-area: insp; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start;
+  position: sticky; top: 96px; max-height: calc(100vh - 108px); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: #33334a transparent; border-radius: 16px;
+}
 .insp-card { border-radius: 16px; padding: 14px 16px 16px; display: grid; gap: 12px; align-content: start; border-top: 3px solid var(--c); min-width: 0; }
 .insp-card h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
 .insp-card h2 .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--c); color: #000; font: 700 11px/1 var(--mono); letter-spacing: 0; }
@@ -422,13 +430,15 @@ footer a { color: var(--cyan); }
   box-shadow: 0 0 20px rgb(0 229 255 / .3); font-size: 14px;
 }
 
-@media (max-width: 1250px) {
-  .layout { grid-template-columns: minmax(0, 1fr); }
+/* Narrower screens: the math monitor moves under the beat, then the sound panel goes below too. */
+@media (max-width: 1699px) {
+  .layout { grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: "insp main" "insp mon"; }
   .monitor { position: static; max-height: none; }
   .plots { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 }
 @media (max-width: 1100px) {
-  .inspector { grid-template-columns: 1fr 1fr; }
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "insp" "mon"; }
+  .inspector { position: static; max-height: none; overflow: visible; grid-template-columns: 1fr 1fr; }
   .inspector .insp-card:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 700px) {
