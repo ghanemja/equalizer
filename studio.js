@@ -1,6 +1,6 @@
 import {
   compile, EquationError, isParamName, noteToFreq, parsePattern, paramValues, renderSong, toWav, Player, VARIABLES, FUNCTIONS, CONSTANTS,
-  triggers, songDuration,
+  triggers, songDuration, beatsPerBar,
 } from './src/equalizer.js?v=dev';
 import { INSTRUMENTS, SONGS, byId, track as makeTrack } from './src/presets.js?v=dev';
 import { initFeed } from './feed.js?v=dev';
@@ -24,7 +24,15 @@ const h = (tag, props = {}, ...kids) => {
 const player = new Player();
 const KINDS = { drums: 'Drums', bass: 'Bass', keys: 'Keys & leads', pads: 'Pads', fx: 'FX' };
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const RATES = { 4: '1/16 note', 2: '1/8 note', 1: '1/4 note (beat)', 0.25: 'Whole bar' };
+/** Step lengths a sound can use, as steps per beat, for the current grid. */
+function rateOptions() {
+  const { B, G } = meter();
+  const opts = new Map([[G, 'One square']]);
+  if (G % 2 === 0 && G > 2) opts.set(G / 2, 'Two squares');
+  if (G > 1) opts.set(1, G === 2 ? 'One beat (two squares)' : 'One beat');
+  opts.set(1 / B, B === 1 ? 'One bar (one beat)' : 'One bar');
+  return opts;
+}
 let song;
 let selected = 0;        // selected track index
 let picked = null;       // { track, token } picked step in a note row
@@ -40,7 +48,7 @@ const str = (v, max, d = '') => (typeof v === 'string' ? v.slice(0, max) : d);
 
 /** Copy a song from an untrusted source (share link, storage) keeping only known, bounded fields. */
 function sanitize(raw) {
-  const s = { title: str(raw?.title, 60, 'Untitled'), bpm: num(raw?.bpm, 40, 220, 120), bars: [1, 2, 4, 8].includes(+raw?.bars) ? +raw.bars : 4, tracks: [] };
+  const s = { title: str(raw?.title, 60, 'Untitled'), bpm: num(raw?.bpm, 40, 220, 120), bars: [1, 2, 4, 8].includes(+raw?.bars) ? +raw.bars : 4, beatsPerBar: num(Math.round(+raw?.beatsPerBar), 1, 8, 4), stepsPerBeat: STEPS_PER_BEAT.includes(+raw?.stepsPerBeat) ? +raw.stepsPerBeat : 4, tracks: [] };
   for (const t of Array.isArray(raw?.tracks) ? raw.tracks.slice(0, 16) : []) {
     const params = {};
     for (const [k, v] of Object.entries(t?.params ?? {})) {
@@ -56,7 +64,7 @@ function sanitize(raw) {
       equation: str(t?.equation, 2000, '0'),
       params, ranges,
       pattern: str(t?.pattern, 800),
-      rate: [4, 2, 1, 0.25].includes(+t?.rate) ? +t.rate : 4,
+      rate: num(t?.rate, 0.125, 8, 4),
       note: noteToFreq(str(t?.note, 4)) ? t.note : undefined,
       gain: num(t?.gain, 0, 2.5, 0.7), pan: num(t?.pan, -1, 1, 0),
       lp: num(t?.lp, 0, 20000, 0), hp: num(t?.hp, 0, 20000, 0),
@@ -138,7 +146,7 @@ const isMelodic = (t) => !!(t.pattern ?? '').trim() && /\s/.test(t.pattern.trim(
 
 function tokensOf(t) {
   const p = (t.pattern ?? '').trim();
-  if (!p) return { compact: true, toks: Array(16).fill('.') };
+  if (!p) return { compact: true, toks: Array(colsPerBar()).fill('.') };
   return /\s/.test(p) ? { compact: false, toks: p.split(/\s+/) } : { compact: true, toks: [...p.replace(/\|/g, '')] };
 }
 function setTokens(t, compact, toks) {
@@ -257,8 +265,11 @@ function drawWave(canvas, t) {
 
 // --- The step grid ------------------------------------------------------------------
 
-const COLS_PER_BAR = 16;
-const totalCols = () => song.bars * COLS_PER_BAR;
+// The grid's shape: B beats per bar (time signature) and G squares per beat (3 = triplets).
+const STEPS_PER_BEAT = [1, 2, 3, 4, 6, 8];
+const meter = () => ({ B: song.beatsPerBar ?? 4, G: song.stepsPerBeat ?? 4 });
+const colsPerBar = () => meter().B * meter().G;
+const totalCols = () => song.bars * colsPerBar();
 
 function instrumentSelect(t, onChange) {
   const sel = h('select', { 'aria-label': 'Sound' });
@@ -276,13 +287,15 @@ function instrumentSelect(t, onChange) {
 function buildGrid() {
   const grid = $('#grid');
   grid.textContent = '';
+  const { B, G } = meter();
   grid.style.setProperty('--cols', totalCols());
+  grid.style.setProperty('--bar-cols', colsPerBar());
 
   // ruler
   const rulerCells = h('div', { class: 'cells' });
   for (let b = 0; b < song.bars; b++) {
-    rulerCells.append(h('div', { class: 'bar', style: `grid-column: ${b * 16 + 1} / span 4`, text: `${b + 1}` }));
-    for (let beat = 1; beat < 4; beat++) rulerCells.append(h('div', { class: 'beat', style: `grid-column: ${b * 16 + beat * 4 + 1} / span 4` }));
+    rulerCells.append(h('div', { class: 'bar', style: `grid-column: ${b * B * G + 1} / span ${G}`, text: `${b + 1}` }));
+    for (let beat = 1; beat < B; beat++) rulerCells.append(h('div', { class: 'beat', style: `grid-column: ${(b * B + beat) * G + 1} / span ${G}` }));
   }
   grid.append(h('div', { class: 'row ruler' }, h('div', { class: 'head', text: 'Sounds' }), rulerCells, h('div', { class: 'tail', text: 'Volume' })));
 
@@ -294,7 +307,8 @@ function buildGrid() {
   const add = instrumentSelect(null, (id) => {
     if (!id) return;
     const t = makeTrack(id);
-    if (!t.pattern) t.pattern = 'x...............';
+    if (!t.pattern) t.pattern = 'x' + '.'.repeat(colsPerBar() - 1);
+    t.rate = meter().G;
     song.tracks.push(t);
     select(song.tracks.length - 1);
     buildGrid(); changed({ now: true });
@@ -356,7 +370,7 @@ function drawCells(row) {
   const t = row.track;
   row.cells.textContent = '';
   const { compact, toks } = tokensOf(t);
-  const span = Math.max(1, Math.round(4 / (t.rate ?? 4)));
+  const span = Math.max(1, Math.round(meter().G / (t.rate ?? 4)));
   const count = Math.max(1, Math.floor(totalCols() / span));
   row.span = span;
   row.cellEls = [];
@@ -368,14 +382,14 @@ function drawCells(row) {
     const classes = ['cell'];
     if (on) classes.push('on');
     if (c >= toks.length) classes.push('ghost');
-    if (Math.floor(col / 4) % 2) classes.push('beat-b');
+    if (Math.floor(col / meter().G) % 2) classes.push('beat-b');
     if (picked && picked.track === t && picked.token === k && on) classes.push('picked');
     const label = !compact && on ? noteLabel(tok) : '';
     const cell = h('button', {
       class: classes.join(' '),
       style: `grid-column: ${col + 1} / span ${span}`,
       'aria-pressed': String(on),
-      'aria-label': `${t.name}, bar ${Math.floor(col / 16) + 1} step ${(col % 16) + 1}${label ? `, ${tok}` : ''}`,
+      'aria-label': `${t.name}, bar ${Math.floor(col / colsPerBar()) + 1} step ${(col % colsPerBar()) + 1}${label ? `, ${tok}` : ''}`,
       title: label ? tok : undefined,
       text: span >= 2 || toks.length <= 16 ? label : '',
     });
@@ -769,7 +783,9 @@ function buildInspector() {
 
   // 3. Rhythm & effects
   const rate = h('select', { 'aria-label': 'Step length' });
-  for (const [v, label] of Object.entries(RATES)) rate.add(new Option(label, v));
+  const rates = rateOptions();
+  if (!rates.has(t.rate ?? 4)) rates.set(t.rate ?? 4, `${fmt(t.rate ?? 4)} per beat`);
+  for (const [v, label] of rates) rate.add(new Option(label, v));
   rate.value = String(t.rate ?? 4);
   rate.addEventListener('change', () => { t.rate = +rate.value; drawCells(rows[selected]); changed({ now: true }); });
 
@@ -952,7 +968,7 @@ function followBar(col) {
   if (!phone.matches || performance.now() - swipedAt < 4000) return;
   const cells = $('#grid .ruler .cells');
   if (!cells) return;
-  const left = Math.floor(col / 16) * cells.getBoundingClientRect().width * 16 / totalCols();
+  const left = Math.floor(col / colsPerBar()) * cells.getBoundingClientRect().width * colsPerBar() / totalCols();
   if (Math.abs(seqPanel.scrollLeft - left) > 2) seqPanel.scrollTo({ left, behavior: 'smooth' });
 }
 
@@ -992,10 +1008,10 @@ function frame() {
 
     const pos = player.position;
     const spb = 60 / song.bpm;
-    const loop = song.bars * 4 * spb;
+    const loop = song.bars * meter().B * spb;
     placePlayhead((pos % loop) / loop);
     $('#clock').value = `${Math.floor(pos / 60)}:${(pos % 60).toFixed(1).padStart(4, '0')}`;
-    const col = Math.floor(pos / (spb / 4)) % totalCols();
+    const col = Math.floor(pos / (spb / meter().G)) % totalCols();
     if (col !== lastCol) {
       lastCol = col;
       followBar(col);
@@ -1126,8 +1142,8 @@ $('#lab-add').addEventListener('click', () => {
   song.tracks.push({
     name: 'Lab sound', equation, params,
     ranges: Object.fromEntries(Object.keys(params).map((k) => [k, [0, 10]])),
-    pattern: usesPitch ? `${note} . . . . . . . ${note} . . . . . . .` : 'x.......x.......',
-    rate: 4, note, gain: 0.7, pan: 0,
+    pattern: usesPitch ? [note, ...Array(colsPerBar() - 1).fill('.')].join(' ') : 'x' + '.'.repeat(colsPerBar() - 1),
+    rate: meter().G, note, gain: 0.7, pan: 0,
   });
   selected = song.tracks.length - 1;
   picked = null;
@@ -1203,6 +1219,61 @@ $('#play').addEventListener('click', () => (player.playing ? stop() : play()));
 $('#volume').addEventListener('input', (e) => { player.volume = +e.target.value; });
 $('#bpm').addEventListener('change', (e) => { song.bpm = num(e.target.value, 40, 220, 120); e.target.value = song.bpm; changed({ now: true }); });
 $('#bars').addEventListener('change', (e) => { song.bars = +e.target.value; buildGrid(); changed({ now: true }); });
+
+/** Move a pattern to a new step length, keeping every hit at the same moment (as near as the new grid allows). */
+function resample(t, toRate) {
+  const from = t.rate ?? 4;
+  const { compact, toks } = tokensOf(t);
+  const len = Math.max(1, Math.round((toks.length * toRate) / from));
+  const out = Array(len).fill('.');
+  toks.forEach((tok, i) => {
+    if (tok === '.' || tok === '_') return;
+    const j = Math.round((i * toRate) / from);
+    if (j < len && out[j] === '.') out[j] = tok;
+  });
+  t.rate = toRate;
+  setTokens(t, compact, out);
+}
+
+/** Change beats per bar: each bar keeps its first beats, and new beats repeat the bar's opening. */
+function rebar(t, oldB, newB) {
+  const rate = t.rate ?? 4;
+  if (Math.abs(rate - 1 / oldB) < 1e-9) { t.rate = 1 / newB; return; }   // one step per bar stays one per bar
+  const per = oldB * rate, perNew = newB * rate;
+  const { compact, toks } = tokensOf(t);
+  if (!Number.isInteger(per) || !Number.isInteger(perNew) || toks.length % per) return;
+  const out = [];
+  for (let b = 0; b < toks.length / per; b++) {
+    const bar = toks.slice(b * per, (b + 1) * per);
+    for (let k = 0; k < perNew; k++) out.push(k < per ? bar[k] : bar[k % per]);
+  }
+  setTokens(t, compact, out);
+}
+
+function setMeter(B, G) {
+  const prev = meter();
+  if (B === prev.B && G === prev.G) return;
+  const before = structuredClone(song.tracks);
+  for (const t of song.tracks) {
+    if (G !== prev.G && (t.rate ?? 4) > 1) resample(t, G);
+    if (B !== prev.B) rebar(t, prev.B, B);
+  }
+  song.beatsPerBar = B;
+  song.stepsPerBeat = G;
+  picked = null;
+  buildGrid(); buildInspector(); showSelected(); changed({ now: true });
+  paintMeter();
+  toast(`${B} beat${B > 1 ? 's' : ''} per bar · ${G} square${G > 1 ? 's' : ''} per beat`, { label: 'Undo', run: () => {
+    song.tracks = before; song.beatsPerBar = prev.B; song.stepsPerBeat = prev.G;
+    buildGrid(); buildInspector(); showSelected(); changed({ now: true }); paintMeter();
+  } });
+}
+function paintMeter() {
+  $('#beats').value = String(meter().B);
+  $('#steps').value = String(meter().G);
+}
+$('#beats').addEventListener('change', (e) => setMeter(+e.target.value, meter().G));
+$('#steps').addEventListener('change', (e) => setMeter(meter().B, +e.target.value));
 document.addEventListener('keydown', (e) => {
   if (e.code !== 'Space' || e.target.closest('input, textarea, select, button, [role=slider]')) return;
   e.preventDefault();
@@ -1297,6 +1368,7 @@ function load(s) {
   picked = null;
   $('#bpm').value = String(song.bpm);
   $('#bars').value = String(song.bars);
+  paintMeter();
   buildGrid();
   $('#inspector').textContent = '';
   buildInspector();

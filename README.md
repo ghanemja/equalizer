@@ -97,6 +97,7 @@ readMath('sin(2πft)·e^(−4x)').equation;   // 'sin(2*PI*f*tau)*E^(-4*tau)'
 - Drums: `x...x...` (`x` fires, `.` lets it ring, `-` stops it, `|` is ignored so you can write `x...|x...`).
 - Notes: `C3 . E3 . G3+B3 -` (notes, or chords joined with `+`).
 - `rate` is steps per beat (4 = sixteenth notes, 0.25 = one per bar).
+- Songs take `beatsPerBar` (the time signature: 4 by default, 3 for a waltz, 5 or 7 for odd time). The studio also has **Squares per beat** (1, 2, 3 for triplets, 4, 6 or 8) for the grid; changing it moves every hit to the nearest square so the beat stays put.
 - `at: [1.5, 3.2]` fires at exact times in seconds, handy for sound effects.
 - `gate: 't > 8 && bar < 12'` is an equation that decides whether a step fires. Use it for arrangement: drop the drums out, bring them back.
 

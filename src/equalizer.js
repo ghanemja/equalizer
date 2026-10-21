@@ -20,7 +20,7 @@ export const VARIABLES = {
   f: 'frequency of the note in Hz',
   beat: 'beats since the song started',
   step: 'index of the step that triggered this note',
-  bar: 'bar number (4 beats per bar)',
+  bar: 'bar number (beatsPerBar beats per bar, 4 by default)',
   r: 'a random number in [0, 1) chosen once per note',
   bpm: 'tempo in beats per minute',
 };
@@ -255,7 +255,7 @@ export function triggers(track, song, duration) {
       if (!st.hit) continue;
       if (gate) {
         const beat = time / spb;
-        if (!gate(time, 0, 0, beat, s, Math.floor(beat / 4), 0, song.bpm ?? 120)) continue;
+        if (!gate(time, 0, 0, beat, s, Math.floor(beat / beatsPerBar(song)), 0, song.bpm ?? 120)) continue;
       }
       hits.push({ time, step: s, notes: st.notes });
     }
@@ -283,6 +283,7 @@ export function renderTrack(track, song, { sampleRate = 44100, duration } = {}) 
   const pv = names.map((n) => values[n]);
   const bpm = song.bpm ?? 120;
   const spb = 60 / bpm;
+  const bpb = beatsPerBar(song);
   let voiceIndex = 0;
   for (const hit of triggers(track, song, duration)) {
     const r = FUNCTIONS.hash(voiceIndex++ * 7.31 + 0.5);
@@ -295,7 +296,7 @@ export function renderTrack(track, song, { sampleRate = 44100, duration } = {}) 
         const t = i / sampleRate;
         const tau = (i - s0) / sampleRate;
         const beat = t / spb;
-        let v = fn(t, tau, f, beat, hit.step, Math.floor(beat / 4), r, bpm, ...pv);
+        let v = fn(t, tau, f, beat, hit.step, Math.floor(beat / bpb), r, bpm, ...pv);
         if (!Number.isFinite(v)) v = 0;
         let g = amp;
         if (tau < FADE_IN) g *= tau / FADE_IN;
@@ -310,9 +311,15 @@ export function renderTrack(track, song, { sampleRate = 44100, duration } = {}) 
   return buf;
 }
 
-/** Length of a song in seconds: `duration`, or `bars` of 4 beats. */
+/** Beats in one bar (the time signature's top number): song.beatsPerBar, 4 by default. */
+export function beatsPerBar(song) {
+  const b = Math.round(+song?.beatsPerBar);
+  return b >= 1 && b <= 16 ? b : 4;
+}
+
+/** Length of a song in seconds: `duration`, or `bars` of beatsPerBar beats. */
 export function songDuration(song) {
-  return song.duration ?? (song.bars ?? 4) * 4 * 60 / (song.bpm ?? 120);
+  return song.duration ?? (song.bars ?? 4) * beatsPerBar(song) * 60 / (song.bpm ?? 120);
 }
 
 /**

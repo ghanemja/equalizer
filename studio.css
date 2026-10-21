@@ -472,15 +472,16 @@ footer a { color: var(--cyan); }
   .console .lcd.song { order: 4; flex: 1 1 200px; }
   .console .lcd input, .console .lcd select, .console .lcd output { font-size: 16px; }
   .console .lcd.song select { font-size: 14px; }
-  .vol { order: 6; flex: 1 1 60px; min-width: 0; }
-  .vol input { width: 100%; }
+  /* Phones have volume buttons: drop the master slider and give the grid settings the room. */
+  .vol { display: none; }
+  .console label.lcd:has(#beats), .console label.lcd:has(#steps) { order: 6; flex: 1 1 0; width: auto; }
   #random { order: 7; }
   .console .btn.text, .console .btn.icon { height: 36px; min-width: 36px; padding: 0 10px; }
   .console .btn.icon { padding: 0; }
 
   /* One bar fills the width; swipe (or let the playhead carry you) between bars. */
   .seq-panel { container-type: inline-size; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; }
-  .grid { min-width: 0; width: calc(var(--head) + var(--cols, 64) / 16 * (100cqw - var(--head) - 8px) + 16px); padding: 0 8px; }
+  .grid { min-width: 0; width: calc(var(--head) + var(--cols, 64) / var(--bar-cols, 16) * (100cqw - var(--head) - 8px) + 16px); padding: 0 8px; }
   .ruler .bar { scroll-snap-align: start; scroll-margin-left: calc(var(--head) + 8px); }
   .row .tail, .row .dot { display: none; }
   .row .head { gap: 4px; padding-right: 6px; }

@@ -29,6 +29,8 @@
       <label class="lcd song"><span>Song</span><select id="song"></select></label>
       <label class="lcd"><span>Tempo</span><input id="bpm" type="number" min="40" max="220" step="1" value="120" aria-label="Tempo in BPM"></label>
       <label class="lcd"><span>Bars</span><select id="bars"><option>1</option><option>2</option><option selected>4</option><option>8</option></select></label>
+      <label class="lcd" title="Beats in each bar: 4 is the usual 4/4, 3 a waltz, 5 or 7 an odd-time groove"><span>Beats/bar</span><select id="beats"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
+      <label class="lcd" title="Squares in each beat of the grid: 4 is sixteenth notes, 3 triplets, 2 eighths, 1 one per beat"><span>Squares/beat</span><select id="steps"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>6</option><option>8</option></select></label>
       <div class="lcd time"><span>Time</span><output id="clock">0:00.0</output></div>
     </div>
 

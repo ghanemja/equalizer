@@ -154,3 +154,15 @@ test('math rhythms', async () => {
   assert.equal(toPattern(makeRhythm('euclid', { k: 3, n: 8 }), ['C3', 'E3']), 'C3 . . E3 . . C3 .');
   assert.throws(() => fromEquation('i.constructor', 8), EquationError);
 });
+
+test('beats per bar sets the bar length and the bar variable', async () => {
+  const { songDuration, beatsPerBar, triggers } = await import('../src/equalizer.js');
+  assert.equal(songDuration({ bpm: 120, bars: 4 }), 8);
+  assert.equal(songDuration({ bpm: 120, bars: 4, beatsPerBar: 3 }), 6);
+  assert.equal(beatsPerBar({ beatsPerBar: 7 }), 7);
+  assert.equal(beatsPerBar({ beatsPerBar: 'nope' }), 4);
+  // A gate on "bar" counts bars of 3 beats: in 3/4 at 60 bpm, bar 1 starts at 3 s.
+  const song = { bpm: 60, bars: 2, beatsPerBar: 3 };
+  const hits = triggers({ pattern: 'x', rate: 1, gate: 'bar == 1' }, song, songDuration(song)).map((h) => h.time);
+  assert.deepEqual(hits, [3, 4, 5]);
+});
