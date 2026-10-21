@@ -16,5 +16,6 @@
     "start": "python3 -m http.server 8080"
   },
   "keywords": ["music", "audio", "synthesizer", "web-audio", "math", "equations", "beats", "procedural-audio"],
+  "author": "Janelle Ghanem",
   "license": "MIT"
 }
