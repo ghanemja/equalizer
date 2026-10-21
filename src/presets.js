@@ -234,7 +234,7 @@ export const SONGS = {
       track('sub808', { name: '808', pattern: ['A1', 'F1', 'D2', 'E1'].map((r) => `${r} . . . . . . . . . ${r} . . . . .`).join(' '), gain: 0.36 }),
       track('rhodes', { pattern: ['A3+C4+E4+G4+B4', 'F3+A3+C4+E4', 'D3+F3+A3+C4+E4', 'E3+G#3+B3+D4'].map((c) => `${c} . . ${c} . . . .`).join(' '), pan: -0.08 }),
       track('choir', { pattern: 'A4+C5+E5 F4+A4+C5 D4+F4+A4 E4+G#4+B4', lp: 1400, gain: 0.1 }),
-      track('crackle'),
+      track('crackle', { name: 'Crackle' }),
     ],
   },
   // tanh(drive * sin(...)): the 808 kick is a sine pushed through the hyperbolic tangent.
