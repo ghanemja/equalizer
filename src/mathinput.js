@@ -13,10 +13,15 @@ const has = (obj, key) => Object.hasOwn(obj, key);
 
 const UNICODE = {
   '−': '-', '–': '-', '—': '-', '×': '*', '·': '*', '⋅': '*', '∙': '*', '∗': '*', '÷': '/',
-  'π': ' pi ', 'τ': ' tau ', 'φ': ' phi ', 'ϕ': ' phi ', '√': ' sqrt ', '≤': '<=', '≥': '>=', '≠': '!=',
+  'π': ' pi ', 'τ': ' tau ', '√': ' sqrt ', '≤': '<=', '≥': '>=', '≠': '!=',
+};
+// Greek letters become their names: knobs (λ -> lambda), except ω, the angular frequency 2πf.
+const GREEK = {
+  'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta', 'ε': 'epsilon', 'ζ': 'zeta', 'η': 'eta', 'θ': 'theta', 'ϑ': 'theta',
+  'κ': 'kappa', 'λ': 'lambda', 'μ': 'mu', 'ν': 'nu', 'ξ': 'xi', 'ρ': 'rho', 'σ': 'sigma', 'φ': 'phi', 'ϕ': 'phi', 'ψ': 'psi', 'ω': 'omega',
 };
 const SUPERSCRIPT = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-', '⁺': '+', '⋅': '.' };
-const ALIASES = { pi: 'PI', Pi: 'PI', e: 'E', ln: 'log', arcsin: 'asin', arccos: 'acos', arctan: 'atan', sgn: 'sign', phi: '1.6180339887' };
+const ALIASES = { pi: 'PI', Pi: 'PI', e: 'E', ln: 'log', arcsin: 'asin', arccos: 'acos', arctan: 'atan', sgn: 'sign', omega: '(2*PI*f)', varphi: 'phi', vartheta: 'theta' };
 
 /** Turn `\frac{a}{b}` (with nested braces) into `((a)/(b))`. */
 function latexFractions(s) {
@@ -86,14 +91,25 @@ export function readMath(input, paramNames = []) {
 
   // Unicode math symbols and superscripts (x² -> x^(2)).
   s = s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺]+/g, (run) => `^(${[...run].map((c) => SUPERSCRIPT[c]).join('')})`);
-  s = s.replace(/[−–—×·⋅∙∗÷πτφϕ√≤≥≠]/g, (c) => UNICODE[c]);
+  s = s.replace(/[−–—×·⋅∙∗÷πτ√≤≥≠]/g, (c) => UNICODE[c]);
+  s = s.replace(/[αβγδεζηθϑκλμνξρσφϕψω]/g, (c) => ` ${GREEK[c]} `);
+
+  // Wrappers people copy along with the math: LaTeX delimiters, "graph", "=" (spreadsheets),
+  // code prefixes (math.sin, np.sin, Math.sin), and trailing results or conditions.
+  s = s.replace(/^\s*(\$\$?|\\\(|\\\[)/, '').replace(/(\$\$?|\\\)|\\\])\s*$/, '')
+    .replace(/^\s*(graph|plot|draw)\s+/i, '')
+    .replace(/^\s*=/, '')
+    .replace(/\b(math|Math|np|numpy|torch|jnp)\./g, '')
+    .replace(/\b(PI|pi|Pi)\(\s*\)/g, 'pi')
+    .replace(/\s*(≈|~=|\\approx)[^]*$/, '')
+    .replace(/\s+(for|where|when|with)\s+[^]*$/i, '');
 
   // LaTeX.
   s = s.replace(/\$/g, '')
     .replace(/\\(left|right|big|Big|bigg|Bigg)\b/g, '')
     .replace(/\\[,;:! ]/g, ' ')
-    .replace(/\\(cdot|times|ast)\b/g, '*')
-    .replace(/\\div\b/g, '/')
+    .replace(/\\(cdot|times|ast)(?![A-Za-z])/g, '*')
+    .replace(/\\div(?![A-Za-z])/g, '/')
     .replace(/\\(operatorname|mathrm|text|textrm)\s*\{([A-Za-z]+)\}/g, ' $2 ');
   s = latexFractions(s);
   s = s.replace(/\\([A-Za-z]+)/g, ' $1 ').replace(/[{[]/g, '(').replace(/[}\]]/g, ')');
@@ -107,7 +123,12 @@ export function readMath(input, paramNames = []) {
   // Tokens, with aliases and split-up variable runs like "ft".
   const known = new Set([...Object.keys(VARIABLES), ...Object.keys(CONSTANTS), ...Object.keys(ALIASES), 'x', ...paramNames]);
   let toks = [];
-  for (const tok of tokens(s)) {
+  for (let tok of tokens(s)) {
+    // Capitalised function names (Wolfram's Sin[...], Excel's SIN(...)) are the same functions.
+    if (tok.type === 'id' && !known.has(tok.value) && !has(FUNCTIONS, tok.value)) {
+      const lower = tok.value.toLowerCase();
+      if (has(FUNCTIONS, lower) || (has(ALIASES, lower) && lower !== 'e')) tok = { ...tok, value: lower };
+    }
     if (tok.type !== 'id' || known.has(tok.value) || has(FUNCTIONS, tok.value)) { toks.push(tok); continue; }
     const parts = tok.value.length <= 5 && /^[A-Za-z]+$/.test(tok.value) ? split(tok.value, known) : null;
     if (parts && parts.length > 1) for (const p of parts) toks.push({ type: 'id', value: p });
