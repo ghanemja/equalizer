@@ -7,6 +7,7 @@ const STEPS = [
   { sel: '.track .cells', title: 'Tap squares to make a beat', text: 'Lit squares play. Tap any square to add or remove a hit.' },
   { sel: '.track .row-name', title: 'Open a sound', text: "Tap a sound's name to open its panel: its equation and its knobs." },
   { sel: '#inspector .insp-card', title: 'Every knob is a number', text: 'Turn a knob and you change a number in the equation. You can also edit the math itself.' },
+  { sel: '#plots .plot', title: 'The math monitor', text: "Every sound's equation, plotted live. The bright part sweeps along the curve as each sound plays, so you can watch the math you're hearing." },
   { sel: '.rhythm-presets', title: 'Let math write the rhythm', text: 'Euclidean, Fibonacci, the golden ratio: one tap fills the row with a rhythm made from math.' },
   { sel: '#beats', title: 'Change the feel', text: '3 beats per bar makes a waltz. 3 squares per beat makes triplets, a swingy shuffle.', target: (el) => el.closest('.lcd') },
   { sel: '.lab', title: 'Paste any math', text: 'Paste a formula from Wolfram Alpha, Desmos, ChatGPT or a textbook and hear what it sounds like.' },
