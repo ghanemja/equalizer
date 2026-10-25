@@ -14,3 +14,4 @@ Every website in this account ships with visitor analytics, no need to ask. When
   `data-site` is the repo or site name. It prefixes click events so sites sharing the dashboard stay apart.
 - This counts page views and every link or button click (`REPO-NAME click: <label>`). For interactions that aren't links or buttons (canvas or 3D clicks, searches, form submits), call `window.track?.('what happened')`.
 - Pages that aren't really for visitors, such as video render harnesses, don't need it.
+- Copy `analytics.js` as is, with its `removeAttribute('data-goatcounter')` line: GoatCounter's `count.js` sends to the first script tag carrying `data-goatcounter`, so without it every page view is posted to the site itself (a 405) and nothing is counted. To check a site, load it and look for a request to `ghanemja.goatcounter.com/count`.

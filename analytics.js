@@ -10,6 +10,9 @@
   const me = document.currentScript;
   const code = me && me.dataset.goatcounter;
   if (!code) return;
+  // GoatCounter's count.js sends to the first script tag with data-goatcounter; take ours off
+  // so it finds its own (otherwise it posts to "ghanemja" on this site and nothing is counted).
+  me.removeAttribute('data-goatcounter');
   const site = me.dataset.site || location.pathname.split('/')[1] || location.hostname;
 
   const gc = document.createElement('script');
