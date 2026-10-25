@@ -390,6 +390,7 @@ function drawCells(row) {
       class: classes.join(' '),
       style: `grid-column: ${col + 1} / span ${span}`,
       'aria-pressed': String(on),
+      'data-track': `beat square (${t.name})`,
       'aria-label': `${t.name}, bar ${Math.floor(col / colsPerBar()) + 1} step ${(col % colsPerBar()) + 1}${label ? `, ${tok}` : ''}`,
       title: label ? tok : undefined,
       text: span >= 2 || toks.length <= 16 ? label : '',
