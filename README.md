@@ -167,4 +167,4 @@ The soundtrack of the [art-medium](https://github.com/ghanemja/art-asset) promo 
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Copyright (c) 2026 Janelle Ghanem. **All rights reserved.** The code, equation language, presets and songs may not be copied, modified or redistributed without written permission. You're welcome to use the studio and share the beats you make. See [LICENSE](LICENSE).
