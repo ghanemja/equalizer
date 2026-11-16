@@ -32,7 +32,8 @@ The songs were rendered straight from their equations with `examples/render.mjs`
 
 ```sh
 node examples/reel/beat.mjs out
-npm i --prefix /tmp/k katex && KATEX=/tmp/k/node_modules/katex/dist node examples/reel/capture.mjs out
+npm i --prefix /tmp/deps katex @fontsource-variable/archivo @fontsource/ibm-plex-mono
+DEPS=/tmp/deps/node_modules node examples/reel/capture.mjs out
 ```
 
 ## Live feed

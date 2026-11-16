@@ -3,7 +3,8 @@
 //
 // Usage:
 //   node examples/reel/beat.mjs out
-//   KATEX=path/to/node_modules/katex/dist node examples/reel/capture.mjs out [out/reel.mp4]
+//   npm i --prefix deps katex @fontsource-variable/archivo @fontsource/ibm-plex-mono
+//   DEPS=deps/node_modules node examples/reel/capture.mjs out [out/reel.mp4]
 //   ... capture.mjs out --stills 60,300,900   (PNG previews of a few frames)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -17,15 +18,15 @@ const [dir = 'reel-out', ...rest] = process.argv.slice(2);
 const stillsArg = rest.indexOf('--stills');
 const stills = stillsArg >= 0 ? rest[stillsArg + 1].split(',').map(Number) : null;
 const outFile = rest.find((a) => a.endsWith('.mp4')) ?? join(dir, 'reel.mp4');
-const katexDir = process.env.KATEX;
-if (!katexDir) throw new Error('Set KATEX to a katex/dist folder (npm i katex)');
+const depsDir = process.env.DEPS;
+if (!depsDir) throw new Error('Set DEPS to a node_modules folder with katex and the fonts (see the usage above)');
 
 const data = JSON.parse(readFileSync(join(dir, 'reel-data.json'), 'utf8'));
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
 await page.route('http://reel.local/**', (route) => {
   const path = new URL(route.request().url()).pathname;
-  const file = path.startsWith('/katex/') ? join(katexDir, path.slice(7)) : join(here, path.slice(1));
+  const file = path.startsWith('/deps/') ? join(depsDir, decodeURIComponent(path.slice(6))) : join(here, path.slice(1));
   route.fulfill({ body: readFileSync(file), contentType: file.endsWith('.css') ? 'text/css' : file.endsWith('.js') ? 'text/javascript' : file.endsWith('.html') ? 'text/html' : file.endsWith('.woff2') ? 'font/woff2' : 'application/octet-stream' });
 });
 page.on('pageerror', (e) => { console.error(e); process.exit(1); });
