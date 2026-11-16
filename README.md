@@ -22,7 +22,18 @@ No samples, no dependencies, no build step. Every sound is computed from math, 4
 - [Floor Function](docs/audio/four-on-the-floor.mp3): four on the floor (house, 124 bpm, 16 bars)
 - [art-medium theme](docs/audio/art-medium-theme.mp3): the soundtrack of the art-medium promo video
 
-All three were rendered straight from their equations with `examples/render.mjs`, then encoded to MP3.
+- [How rap beats are made](docs/reel/how-rap-beats-are-made.mp4): a 50-second vertical reel (1080×1920) that builds a trap beat step by step (kick, snare, hats, 808, chords, EQ, sidechain, mix) with each step's equation on screen
+
+The songs were rendered straight from their equations with `examples/render.mjs`, then encoded to MP3.
+
+### The reel
+
+`examples/reel/beat.mjs` renders the reel's beat (140 bpm, C minor) from equations, then mixes it the way a producer would: RBJ biquad EQ (high-pass the keys at 180 Hz, cut 350 Hz mud, roll off the highs), sidechain ducking of the 808 under the kick, a tanh soft clip and a −1 dBFS peak. No bells or high leads. `examples/reel/capture.mjs` draws every frame from `reel.html` with Playwright and encodes the MP4 with ffmpeg:
+
+```sh
+node examples/reel/beat.mjs out
+npm i --prefix /tmp/k katex && KATEX=/tmp/k/node_modules/katex/dist node examples/reel/capture.mjs out
+```
 
 ## Live feed
 
