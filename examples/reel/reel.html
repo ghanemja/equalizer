@@ -1,0 +1,363 @@
+<!doctype html>
+<!-- Video render harness for the "How rap beats are made" reel (not a visitor page, so no analytics).
+     capture.mjs loads it, calls render(frame) for every frame and screenshots it. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rap beat reel</title>
+<link rel="stylesheet" href="katex/katex.min.css">
+<script src="katex/katex.min.js"></script>
+<style>
+  :root {
+    --bg: #08080c; --panel: #13131b; --panel-2: #1b1b26; --line: #2a2a3a; --text: #e8e8f2; --muted: #8b8ba3;
+    --cyan: #00e5ff; --magenta: #ff3cac; --lime: #b6ff3c; --amber: #ffb020; --violet: #9d7bff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, sans-serif; }
+  #c { position: absolute; inset: 0; }
+  .layer { position: absolute; left: 80px; right: 80px; }
+  #top { top: 96px; display: flex; justify-content: space-between; align-items: center; font: 600 30px/1 Inter; letter-spacing: .02em; }
+  #brand { display: flex; align-items: center; gap: 14px; }
+  #brand i { width: 18px; height: 18px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 22px var(--cyan); }
+  #stepno { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #head { top: 170px; }
+  #kicker { font: 700 26px/1 Inter; letter-spacing: .16em; color: var(--c, var(--cyan)); text-transform: uppercase; }
+  #title { margin-top: 16px; font: 800 70px/1.04 "Inter Display", Inter; letter-spacing: -.02em; }
+  #card { top: 400px; height: 360px; border: 2px solid var(--line); border-radius: 28px; padding: 30px 34px;
+    background: linear-gradient(180deg, rgb(255 255 255 / .035), rgb(255 255 255 / .01)), var(--panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 26px; }
+  .eq { font-size: 46px; color: #fff; white-space: nowrap; }
+  .eq .katex { font-size: 1em; }
+  .eq.small { font-size: 38px; }
+  .eq-note { font: 500 26px/1.3 Inter; color: var(--muted); margin-top: -14px; }
+  .eq-note b { color: var(--c, var(--cyan)); font-weight: 700; }
+  #sub { top: 790px; font: 700 30px/1.2 Inter; color: var(--c, var(--cyan)); display: flex; justify-content: space-between; }
+  #sub span:last-child { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+  #caption { top: 1615px; font: 500 35px/1.36 Inter; color: #d7d7e6; }
+  #caption b { color: #fff; }
+  #foot { top: 1828px; font: 600 26px/1 Inter; color: var(--muted); display: flex; justify-content: space-between; }
+  #foot b { color: var(--text); }
+  #outro { position: absolute; left: 80px; right: 80px; top: 820px; text-align: center; opacity: 0; }
+  #outro .url { font: 800 64px/1.1 "Inter Display", Inter; color: var(--cyan); text-shadow: 0 0 40px rgb(0 229 255 / .45); }
+  #outro .small { margin-top: 26px; font: 500 34px/1.4 Inter; color: var(--muted); }
+  .fade { transition: none; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<div class="layer" id="top"><div id="brand"><i></i>equalizer</div><div id="stepno"></div></div>
+<div class="layer" id="head"><div id="kicker"></div><div id="title"></div></div>
+<div class="layer" id="card"></div>
+<div class="layer" id="sub"><span id="subl"></span><span id="subr"></span></div>
+<div class="layer" id="caption"></div>
+<div id="outro"><div class="url">ghanemja.github.io/equalizer</div><div class="small">Every sound you heard is an equation<br>you can open, hear and tweak.</div></div>
+<div class="layer" id="foot"><span><b>No samples.</b> Every sound is math.</span><span>140 BPM · C minor</span></div>
+<script>
+const COLORS = { kick: '#ff3cac', snare: '#ff7a59', hats: '#b6ff3c', '808': '#ffb020', keys: '#00e5ff', pad: '#9d7bff' };
+const TEXT = {
+  intro: {
+    kicker: 'How rap beats are made', c: '#00e5ff', title: 'A rap beat,<br>built from math',
+    eqs: [['y(t)=\\sum_{k} A_k\\,\\sin(2\\pi f_k t)\\,e^{-t/\\tau_k}', 'Every sound = sine waves × envelopes']],
+    caption: 'Every sound in this beat is an <b>equation</b>, rendered by equalizer. No samples, no plug-ins. Let’s build it from zero.',
+  },
+  kick: {
+    kicker: 'Step 1 · Tempo & kick', c: COLORS.kick, title: 'The kick',
+    eqs: [['\\Delta t=\\frac{60}{140\\ \\text{BPM}}=0.43\\ \\text{s per beat}'],
+      ['k(t)=\\sin\\!\\Big(2\\pi\\big[\\,52t+6\\,(1-e^{-30t})\\big]\\Big)\\,e^{-9t}', 'Pitch dives <b>232 Hz → 52 Hz</b> in ~50 ms']],
+    caption: 'Trap runs at <b>140 BPM</b> but feels half-time. The kick is a sine whose pitch drops fast: that drop is the <b>punch</b>.',
+  },
+  snare: {
+    kicker: 'Step 2 · Snare & clap', c: COLORS.snare, title: 'Snare on beat 3',
+    eqs: [['s(t)=0.45\\sin(2\\pi\\,190\\,t)\\,e^{-18t}+0.55\\,n(t)\\,e^{-14t}', 'Tuned drum body + white noise <b>n(t)</b>'],
+      ['c(t)=n(t)\\big(e^{-16t}+0.8\\,e^{-400|t-11\\text{ms}|}+0.6\\,e^{-400|t-22\\text{ms}|}\\big)', 'Clap: three hands, <b>11 ms</b> apart']],
+    caption: 'Half-time puts the backbeat on <b>3</b> instead of 2 and 4. A clap is layered on the snare so it cuts through.',
+  },
+  hats: {
+    kicker: 'Step 3 · Hi-hats', c: COLORS.hats, title: 'Hats: swing & rolls',
+    eqs: [['t_n=\\big(n+0.12\\,[\\,n\\ \\text{odd}\\,]\\big)\\cdot\\tfrac{\\Delta t}{2}', 'Off-beats land at <b>56%</b> of the beat: swing'],
+      ['v_n=0.7+0.3\\,r_n,\\quad r_n\\sim U(0,1)', 'Random velocity per hit, like a real hand']],
+    caption: 'Hats drive the groove. Bar 4 rolls <b>8ths → triplets → 32nds</b>. They stay dark and quiet: no shrill top end.',
+  },
+  '808': {
+    kicker: 'Step 4 · The 808', c: COLORS['808'], title: 'The 808, in key',
+    eqs: [['f_n=440\\cdot 2^{(n-69)/12}\\ \\Rightarrow\\ \\text{C2}=65.4\\ \\text{Hz}', 'Equal temperament: 12 notes per doubling'],
+      ['b(t)=\\tanh\\!\\big(2.5\\,\\sin 2\\pi f t\\big)\\,e^{-1.2t}', 'tanh adds harmonics at <b>3f, 5f…</b>']],
+    caption: 'The 808 plays the roots <b>C – A♭ – F – G</b> on the kick’s rhythm. The harmonics let phones hear a 65 Hz bass. Bar 4 <b>glides G → C</b>.',
+  },
+  chords: {
+    kicker: 'Step 5 · Chords', c: COLORS.keys, title: 'Chords: i – VI – iv – V',
+    eqs: [['\\text{Cm9}=130.8\\,\\text{Hz}\\times\\big\\{1,\\tfrac32,\\tfrac95,\\tfrac94,\\tfrac{12}{5}\\big\\}', 'Frequency ratios of the chord tones'],
+      ['p(t)=\\big[\\sin 2\\pi ft+0.3\\,e^{-3t}\\sin 4\\pi ft\\big]\\,e^{-0.9t}', 'Warm electric piano, voiced low']],
+    caption: 'Cm9 → A♭maj9 → Fm9 → G7. Hear the low end get <b>cloudy</b>? The keys and the 808 are fighting over <b>100–300 Hz</b>.',
+  },
+  eq: {
+    kicker: 'Step 6 · EQ', c: COLORS.keys, title: 'EQ: a lane for every sound',
+    eqs: [['H(z)=\\dfrac{b_0+b_1z^{-1}+b_2z^{-2}}{1+a_1z^{-1}+a_2z^{-2}}', 'A biquad filter: the math inside every EQ'],
+      ['G(f)=20\\log_{10}\\big|H(e^{\\,j2\\pi f/f_s})\\big|\\ \\text{dB}']],
+    caption: 'Below ~120 Hz belongs to the <b>kick and 808</b>. Everything else gets filtered out of their way.',
+  },
+  sidechain: {
+    kicker: 'Step 7 · Sidechain', c: COLORS['808'], title: 'Duck the 808 under the kick',
+    eqs: [['g(t)=1-0.5\\,e^{-(t-t_k)/80\\,\\text{ms}}', '<b>t<sub>k</sub></b> = time of the last kick hit'],
+      ['y(t)=g(t)\\cdot b(t)']],
+    caption: 'Every kick dips the 808 by half and lets it recover in ~80 ms, so the kick’s <b>punch</b> cuts through the bass.',
+  },
+  mix: {
+    kicker: 'Step 8 · Mix & master', c: COLORS.pad, title: 'Glue it together',
+    eqs: [['y=\\tanh(0.75\\,x)', 'Soft clipper: rounds peaks instead of cracking'],
+      ['\\text{peak}=-1\\ \\text{dBFS}=10^{-1/20}=0.89', 'dB = 20 log<sub>10</sub>(amplitude)']],
+    caption: 'Balance levels in dB, add a low pad, glue the bus, leave headroom. The beat’s <b>ready for vocals</b>.',
+  },
+  outro: { kicker: 'Your turn', c: '#00e5ff', title: 'Make your own beat', eqs: [], caption: '' },
+};
+const EQ_STEPS = {
+  16: 'EQ off: everything overlaps',
+  17: 'High-pass the keys at 180 Hz',
+  18: 'Cut keys “mud” at 350 Hz, −4 dB',
+  19: 'Roll off harsh highs: shelf −3 dB',
+};
+const ROWS = [
+  { id: 'kick', label: 'Kick', from: 2, ev: ['kick'] },
+  { id: 'snare', label: 'Snare', from: 4, ev: ['snare'] },
+  { id: 'hats', label: 'Hats', from: 6, ev: ['hats'] },
+  { id: '808', label: '808', from: 8, ev: ['808', '808 glide'] },
+  { id: 'keys', label: 'Keys', from: 0, ev: ['keys'] },
+  { id: 'pad', label: 'Pad', from: 22, ev: ['pad'] },
+];
+
+let D, curSection = null, curSub = null;
+const $ = (id) => document.getElementById(id);
+const ctx = $('c').getContext('2d');
+const tex = (s) => katex.renderToString(s, { throwOnError: true, displayMode: false });
+
+async function init(data) { D = data; await document.fonts.ready; }
+
+function setSection(s) {
+  if (curSection === s.id) return;
+  curSection = s.id;
+  const T = TEXT[s.id];
+  document.documentElement.style.setProperty('--c', T.c);
+  $('kicker').textContent = T.kicker;
+  $('title').innerHTML = T.title;
+  $('card').innerHTML = T.eqs.map(([e, note]) => `<div class="eq${e.length > 70 ? ' small' : ''}">${tex(e)}</div>${note ? `<div class="eq-note">${note}</div>` : ''}`).join('');
+  $('card').style.display = T.eqs.length ? 'flex' : 'none';
+  $('caption').innerHTML = T.caption;
+  const idx = D.sections.findIndex((x) => x.id === s.id);
+  $('stepno').textContent = idx >= 1 && idx <= 8 ? `${idx} / 8` : '';
+  // shrink any equation that is too wide for the card
+  for (const el of document.querySelectorAll('.eq')) {
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    while (el.scrollWidth > el.clientWidth && size > 24) { size -= 1; el.style.fontSize = size + 'px'; }
+  }
+}
+
+function render(frame) {
+  const t = frame / D.fps;
+  const barF = t / D.bar, bar = Math.floor(barF);
+  const s = D.sections.find((x) => bar >= x.from && bar < x.to) ?? D.sections.at(-1);
+  setSection(s);
+  const T = TEXT[s.id];
+  const since = t - s.from * D.bar;
+  const ease = (x) => 1 - (1 - Math.min(1, Math.max(0, x))) ** 3;
+  const k = ease(since / 0.35);
+  for (const id of ['head', 'card', 'caption']) {
+    $(id).style.opacity = k; $(id).style.transform = `translateY(${(1 - k) * 24}px)`;
+  }
+  const outro = s.id === 'outro';
+  $('outro').style.opacity = outro ? k : 0;
+  $('sub').style.opacity = outro ? 0 : 1;
+  $('caption').style.display = outro ? 'none' : '';
+  // subtitle line above the grid
+  const chord = D.chords[((bar % 4) + 4) % 4];
+  let subl = '';
+  if (s.id === 'eq') subl = EQ_STEPS[Math.min(19, Math.max(16, bar))];
+  else if (s.id === '808') subl = `808 root: ${D.roots[bar % 4].replace('b', '♭')}${bar % 4 === 3 ? ' → glide to C' : ''}`;
+  else if (bar < 2 || bar >= 12) subl = `Chord: ${chord.replace('b', '♭')}`;
+  else subl = s.id === 'kick' ? 'One bar = 4 beats = 16 steps' : s.id === 'snare' ? 'Backbeat on 3' : 'Swing 56%';
+  $('subl').textContent = subl;
+  $('subr').textContent = `Bar ${String(bar + 1).padStart(2, '0')} · Beat ${Math.floor((barF - bar) * 4) + 1}`;
+  draw(t, bar, barF - bar, s, outro);
+}
+
+function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+function draw(t, bar, phase, s, outro) {
+  ctx.clearRect(0, 0, 1080, 1920);
+  // background glow, tinted by the section color
+  const c = TEXT[s.id].c;
+  let g = ctx.createRadialGradient(160, 0, 0, 160, 0, 1100);
+  g.addColorStop(0, hexA(c, 0.13)); g.addColorStop(1, 'transparent');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 1080, 1920);
+  g = ctx.createRadialGradient(1080, 1920, 0, 1080, 1920, 1100);
+  g.addColorStop(0, 'rgba(255,60,172,0.08)'); g.addColorStop(1, 'transparent');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 1080, 1920);
+  // subtle beat pulse on the kick
+  const lastKick = D.kickTimes.filter((x) => x <= t).at(-1) ?? -9;
+  const pulse = Math.exp(-(t - lastKick) * 8) * (bar >= 2 && bar < 26 ? 1 : 0);
+  if (pulse > 0.01) { ctx.fillStyle = hexA(COLORS.kick, 0.05 * pulse); ctx.fillRect(0, 0, 1080, 1920); }
+
+  if (!outro) { drawGrid(t, bar, phase); drawSpectrum(t, bar, s); }
+  else drawOutroWave(t);
+  drawProgress(t);
+}
+
+function drawGrid(t, bar, phase) {
+  const X = 80, Y = 850, W = 920, labelW = 130, rowH = 52, gap = 8;
+  const gx = X + labelW, gw = W - labelW, cell = gw / 16;
+  ctx.font = '600 27px Inter'; ctx.textBaseline = 'middle';
+  ROWS.forEach((row, r) => {
+    const y = Y + r * (rowH + gap);
+    const active = bar >= row.from || (row.id === 'keys' && bar < 2);
+    const live = row.id === 'keys' ? (bar < 2 || bar >= 12) : row.id === 'pad' ? bar >= 22 : row.id === '808' ? bar < 27 && bar >= 8 : bar >= row.from && bar < 26;
+    const col = COLORS[row.id];
+    ctx.fillStyle = active ? (live ? '#e8e8f2' : '#5a5a70') : '#34344a';
+    ctx.fillText(row.label, X, y + rowH / 2);
+    for (let i = 0; i < 16; i++) {
+      roundRect(gx + i * cell + 3, y, cell - 6, rowH, 9);
+      ctx.fillStyle = i % 4 === 0 ? '#1d1d2a' : '#15151f';
+      ctx.fill();
+    }
+    if (!active) return;
+    const barStart = bar * D.bar;
+    for (const name of row.ev) {
+      for (const e of D.events[name]) {
+        const pos = (e.t - barStart) / D.step;
+        if (pos < -0.01 || pos > 15.9) continue;
+        const age = t - e.t;
+        const glow = age >= 0 ? Math.exp(-age * 7) : 0;
+        const w = row.id === 'hats' && pos % 1 > 0.01 ? cell * 0.55 : cell - 6;
+        const x = gx + pos * cell + 3;
+        roundRect(x, y, Math.min(w, cell - 6), rowH, 9);
+        ctx.fillStyle = hexA(col, age >= 0 ? 0.55 + 0.45 * glow : 0.28);
+        if (glow > 0.05) { ctx.shadowColor = col; ctx.shadowBlur = 30 * glow; }
+        ctx.fill(); ctx.shadowBlur = 0;
+        if ((row.id === 'keys' || row.id === '808') && name !== '808 glide' && pos < 0.5) {
+          ctx.font = '800 22px Inter';
+          const label = row.id === 'keys' ? D.chords[bar % 4] : D.roots[bar % 4];
+          ctx.lineWidth = 5; ctx.strokeStyle = '#08080c'; ctx.lineJoin = 'round';
+          ctx.strokeText(label.replace('b', '♭'), x + 8, y + rowH / 2);
+          ctx.fillStyle = '#fff'; ctx.fillText(label.replace('b', '♭'), x + 8, y + rowH / 2);
+          ctx.font = '600 27px Inter';
+        }
+      }
+    }
+  });
+  // playhead
+  const px = gx + phase * gw;
+  ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 16;
+  ctx.fillRect(px - 2, Y - 14, 4, ROWS.length * (rowH + gap) + 20); ctx.shadowBlur = 0;
+}
+
+function hzToX(f, X, W) { return X + W * Math.log(f / 25) / Math.log(16000 / 25); }
+
+function drawSpectrum(t, bar, s) {
+  const X = 80, Y = 1275, W = 920, H = 270;
+  roundRect(X, Y, W, H, 24); ctx.fillStyle = '#101018'; ctx.fill();
+  ctx.strokeStyle = '#2a2a3a'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.save(); roundRect(X, Y, W, H, 24); ctx.clip();
+  const dbToY = (db) => Y + H - (db + 72) / 72 * H;
+  // frequency zones
+  const zone = (f0, f1, col, label) => {
+    const x0 = hzToX(f0, X, W), x1 = hzToX(f1, X, W);
+    ctx.fillStyle = hexA(col, 0.07); ctx.fillRect(x0, Y, x1 - x0, H);
+    ctx.fillStyle = hexA(col, 0.9); ctx.font = '700 20px Inter'; ctx.textBaseline = 'top';
+    ctx.fillText(label, x0 + 10, Y + 14);
+  };
+  if (bar >= 8) zone(25, 120, COLORS['808'], 'KICK + 808');
+  if (s.id === 'chords') zone(120, 350, '#ff5050', 'MUD ZONE');
+  // grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) {
+    const x = hzToX(f, X, W); ctx.beginPath(); ctx.moveTo(x, Y); ctx.lineTo(x, Y + H); ctx.stroke();
+  }
+  // spectrum: smoothed over 3 frames
+  const fr = Math.min(D.frames - 1, Math.round(t * D.fps));
+  const spec = D.spectrum[fr].map((v, k) => Math.max(v, (D.spectrum[fr - 1]?.[k] ?? -90) - 4, (D.spectrum[fr - 2]?.[k] ?? -90) - 8));
+  const n = spec.length, bw = W / n;
+  for (let k = 0; k < n; k++) {
+    const db = Math.max(-72, spec[k] + 6);
+    const y = dbToY(db);
+    const f = D.bandHz[k];
+    const col = f < 120 ? COLORS['808'] : f < 2000 ? COLORS.keys : COLORS.hats;
+    const gr = ctx.createLinearGradient(0, y, 0, Y + H);
+    gr.addColorStop(0, hexA(col, 0.95)); gr.addColorStop(1, hexA(col, 0.15));
+    ctx.fillStyle = gr; ctx.fillRect(X + k * bw + 1, y, bw - 2, Y + H - y);
+  }
+  // EQ curves in the EQ section and after
+  if (bar >= 17 && bar < 26) {
+    const stage = Math.min(19, bar);
+    const curveY = (db) => Y + H * 0.42 - db * 7;
+    const drawCurve = (name, col, label) => {
+      const pts = D.eqCurves[name][stage];
+      ctx.beginPath();
+      D.curveHz.forEach((f, i) => { const x = hzToX(f, X, W), y = curveY(Math.max(-24, pts[i])); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.stroke(); ctx.shadowBlur = 0;
+      if (label) {
+        const i = D.curveHz.findIndex((f) => f > 900);
+        ctx.fillStyle = col; ctx.font = '700 22px Inter'; ctx.textBaseline = 'bottom';
+        ctx.fillText(label, hzToX(D.curveHz[i], X, W), curveY(pts[i]) - 10);
+      }
+    };
+    ctx.setLineDash([]); ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X, curveY(0)); ctx.lineTo(X + W, curveY(0)); ctx.stroke();
+    drawCurve('keys', COLORS.keys, 'KEYS EQ');
+    if (stage >= 19) drawCurve('hats', COLORS.hats, null);
+  }
+  // sidechain: the gain curve g(t) of the last bar, scrolling
+  if (s.id === 'sidechain' || s.id === 'mix') {
+    const win = D.bar, t0 = t - win;
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const tt = t0 + win * i / 200;
+      const tk = D.kickTimes.filter((x) => x <= tt).at(-1);
+      const dt = tk == null ? 9 : tt - tk;
+      const gval = tt < D.sidechain.from ? 1 : 1 - D.sidechain.depth * Math.min(1, dt / 0.003) * Math.exp(-dt / D.sidechain.tau);
+      const x = X + W * i / 200, y = Y + 60 + (1 - gval) * (H - 120) * 1.6;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s.id === 'sidechain' ? 5 : 3; ctx.globalAlpha = s.id === 'sidechain' ? 1 : 0.5;
+    ctx.shadowColor = '#fff'; ctx.shadowBlur = 12; ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    if (s.id === 'sidechain') {
+      ctx.fillStyle = '#fff'; ctx.font = '700 22px Inter'; ctx.textBaseline = 'top'; ctx.fillText('808 GAIN g(t)', X + W - 190, Y + 14);
+    }
+  }
+  ctx.restore();
+  // axis labels
+  ctx.fillStyle = '#8b8ba3'; ctx.font = '600 20px Inter'; ctx.textBaseline = 'top';
+  for (const [f, l] of [[50, '50'], [100, '100'], [200, '200'], [500, '500'], [1000, '1k'], [2000, '2k'], [5000, '5k'], [10000, '10k Hz']]) {
+    ctx.fillText(l, hzToX(f, X, W) - 12, Y + H + 10);
+  }
+  ctx.textBaseline = 'bottom'; ctx.font = '700 22px Inter'; ctx.fillStyle = '#8b8ba3';
+  ctx.fillText('SPECTRUM OF THE BEAT (LIVE)', X, Y - 12);
+}
+
+function drawOutroWave(t) {
+  const fr = Math.min(D.frames - 1, Math.round(t * D.fps));
+  const pts = D.scope[fr];
+  ctx.beginPath();
+  pts.forEach((v, i) => { const x = 80 + 920 * i / (pts.length - 1), y = 1350 - v * 260; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 5; ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 24; ctx.stroke(); ctx.shadowBlur = 0;
+}
+
+function drawProgress(t) {
+  const X = 80, Y = 1790, W = 920, gap = 8;
+  const steps = D.sections;
+  const total = D.duration;
+  steps.forEach((s, i) => {
+    const t0 = s.from * D.bar, t1 = i === steps.length - 1 ? total : s.to * D.bar;
+    const x0 = X + W * t0 / total + gap / 2, x1 = X + W * t1 / total - gap / 2;
+    roundRect(x0, Y, x1 - x0, 8, 4); ctx.fillStyle = '#25253a'; ctx.fill();
+    const k = Math.min(1, Math.max(0, (t - t0) / (t1 - t0)));
+    if (k > 0) { roundRect(x0, Y, (x1 - x0) * k, 8, 4); ctx.fillStyle = TEXT[s.id].c; ctx.fill(); }
+  });
+}
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+window.init = init; window.render = render;
+</script>
+</body>
+</html>
